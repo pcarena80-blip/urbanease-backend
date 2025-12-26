@@ -11,89 +11,32 @@ connectDB();
 
 const seedData = async () => {
     try {
-        await User.deleteMany();
-        await Bill.deleteMany();
+        // 1. Remove Test User if exists (Cleaning up old test data)
+        await User.deleteOne({ email: 'test@example.com' });
+        console.log('Removed Test User (if existed)');
 
-        // Hash password
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('password123', salt);
+        // 2. Ensure Super Admin Exists
+        const adminEmail = 'admin@urbanease.com';
+        const adminExists = await User.findOne({ email: adminEmail });
 
-        const user = await User.create({
-            name: 'Test User',
-            email: 'test@example.com',
-            phone: '1234567890',
-            password: hashedPassword // Use hashed password
-        });
+        if (!adminExists) {
+            const salt = await bcrypt.genSalt(10);
+            const hashedPassword = await bcrypt.hash('password123', salt);
 
-        console.log('User created:', user.name);
+            const adminUser = await User.create({
+                name: 'Super Admin',
+                email: adminEmail,
+                phone: '0000000000',
+                password: hashedPassword,
+                role: 'superadmin',
+                isVerified: true
+            });
+            console.log('Super Admin created:', adminUser.email);
+        } else {
+            console.log('Super Admin already exists');
+        }
 
-        const bills = [
-            {
-                userId: user._id,
-                type: 'Electricity',
-                amount: 4500,
-                dueDate: '25 Dec 2024',
-                month: 'December 2024',
-                refNo: 'ELEC-123456',
-                status: 'due'
-            },
-            {
-                userId: user._id,
-                type: 'Gas',
-                amount: 1200,
-                dueDate: '20 Dec 2024',
-                month: 'December 2024',
-                refNo: 'GAS-789012',
-                status: 'due'
-            },
-            {
-                userId: user._id,
-                type: 'Internet',
-                amount: 3000,
-                dueDate: '05 Jan 2025',
-                month: 'January 2025',
-                refNo: 'NET-345678',
-                status: 'upcoming'
-            },
-            {
-                userId: user._id,
-                type: 'Water',
-                amount: 800,
-                dueDate: '15 Nov 2024',
-                month: 'November 2024',
-                refNo: 'WAT-901234',
-                status: 'paid',
-                method: 'Credit Card',
-                paidDate: new Date('2024-11-14')
-            }
-        ];
-
-        // Seed Community Messages
-        const communityMessages = [
-            {
-                senderId: user._id,
-                receiverId: 'community',
-                message: 'Welcome to the Urban East Community!',
-                timestamp: new Date()
-            },
-            {
-                senderId: user._id,
-                receiverId: 'community',
-                message: 'This is a test message for everyone.',
-                timestamp: new Date(Date.now() + 1000)
-            }
-        ];
-
-        // Import ChatMessage model locally if not at top, or assume it's available
-        const ChatMessage = require('./models/ChatMessage');
-        await ChatMessage.deleteMany({}); // Clear old chats
-        await ChatMessage.insertMany(communityMessages);
-
-        await Bill.insertMany(bills);
-
-        console.log('Bills created');
-
-        console.log('Database seeded! Please refresh MongoDB Compass.');
+        console.log('Database seeded/cleaned! Please refresh MongoDB Compass.');
         process.exit();
     } catch (error) {
         console.error('Error seeding data:', error);

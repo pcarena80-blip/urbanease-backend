@@ -7,6 +7,7 @@ const userSchema = new mongoose.Schema({
     password: { type: String, required: true },
     cnic: { type: String },
     propertyType: { type: String, enum: ['house', 'apartment'], default: 'house' },
+    role: { type: String, enum: ['user', 'admin', 'superadmin'], default: 'user' },
     ownership: { type: String, enum: ['owner', 'tenant'], default: 'owner' },
     // House specific
     block: { type: String },
@@ -18,7 +19,9 @@ const userSchema = new mongoose.Schema({
     flatNumber: { type: String },
     isVerified: { type: Boolean, default: false }, // Default unverified, verified after admin check
     lastCommunityRead: { type: Date, default: Date.now },
-    registrationDate: { type: Date, default: Date.now }
+    registrationDate: { type: Date, default: Date.now },
+    otp: { type: String },
+    otpExpires: { type: Date }
 });
 
 module.exports = mongoose.model('User', userSchema);

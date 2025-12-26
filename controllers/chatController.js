@@ -25,6 +25,22 @@ const getMessages = async (req, res) => {
         .populate('senderId', 'name email');
 
     const formattedMessages = messages.map(msg => {
+        // Handle orphaned messages (sender deleted)
+        if (!msg.senderId) {
+            return {
+                id: msg._id,
+                sender: 'unknown',
+                senderId: null,
+                name: 'Unknown User',
+                avatar: '??',
+                message: msg.message,
+                attachment: msg.attachment,
+                attachmentType: msg.attachmentType,
+                time: new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                timestamp: msg.timestamp
+            };
+        }
+
         const isMe = msg.senderId._id.toString() === myId;
         const senderName = msg.senderId.name;
         const initials = senderName ? senderName.split(' ').map(n => n[0]).join('').toUpperCase() : '??';
@@ -67,8 +83,11 @@ const sendMessage = async (req, res) => {
     let attachmentType = null;
 
     if (file) {
-        attachment = file.path.replace(/\\/g, '/'); // Normalize path for frontend
+        // Store relative path so frontend can construct URL
+        // backend serves 'uploads' folder statically
+        attachment = 'uploads/' + file.filename;
 
+        console.log('Processed Attachment Path:', attachment);
         console.log('Detected Mimetype:', file.mimetype);
         const isImageMime = file.mimetype.startsWith('image');
         const isImageExt = /\.(jpg|jpeg|png|gif|webp)$/i.test(file.originalname);
@@ -170,8 +189,42 @@ const getInbox = async (req, res) => {
     }
 };
 
+// @desc    Delete chat message
+// @route   DELETE /api/chat/:id
+// @access  Private
+const deleteMessage = async (req, res) => {
+    try {
+        const messageId = req.params.id;
+        const userId = req.user.id;
+
+        const message = await ChatMessage.findById(messageId);
+
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        // Check ownership
+        if (message.senderId.toString() !== userId) {
+            return res.status(401).json({ message: 'Not authorized to delete this message' });
+        }
+
+        await message.deleteOne();
+
+        // Emit socket event for real-time deletion if it's a community message
+        if (req.io && message.receiverId === 'community') {
+            req.io.to('community').emit('message_deleted', { id: messageId });
+        }
+
+        res.json({ message: 'Message deleted' });
+    } catch (error) {
+        console.error('Delete Message Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getMessages,
     sendMessage,
-    getInbox
+    getInbox,
+    deleteMessage
 };

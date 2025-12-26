@@ -8,5 +8,6 @@ const upload = require('../middleware/uploadMiddleware');
 router.get('/inbox', protect, require('../controllers/chatController').getInbox);
 router.get('/:userId', protect, getMessages);
 router.post('/', protect, upload.single('file'), sendMessage);
+router.delete('/:id', protect, require('../controllers/chatController').deleteMessage);
 
 module.exports = router;

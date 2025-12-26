@@ -1,3 +1,4 @@
+// Force Deploy Fix 404
 const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
@@ -46,6 +47,8 @@ app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/profile', require('./routes/profileRoutes'));
 app.use('/api/payment', require('./routes/paymentRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/notices', require('./routes/noticeRoutes'));
 
 // Default Route
 app.get('/', (req, res) => {

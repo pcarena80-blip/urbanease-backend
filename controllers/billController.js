@@ -4,8 +4,15 @@ const Bill = require('../models/Bill');
 // @route   GET /api/bills
 // @access  Private
 const getBills = async (req, res) => {
-    const bills = await Bill.find({ userId: req.user.id });
-    res.status(200).json(bills);
+    try {
+        console.log(`[DEBUG] Fetching bills for user: ${req.user.id}`);
+        const bills = await Bill.find({ userId: req.user.id });
+        console.log(`[DEBUG] Found ${bills.length} bills`);
+        res.status(200).json(bills);
+    } catch (error) {
+        console.error('[DEBUG] Error fetching bills:', error);
+        res.status(500).json({ message: 'Server Error fetching bills' });
+    }
 };
 
 // @desc    Set bill

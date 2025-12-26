@@ -41,6 +41,8 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'Please add all fields' });
     }
 
+    email = email.toLowerCase(); // Enforce lowercase
+
     if (!validateEmail(email)) {
         return res.status(400).json({ message: 'Invalid email domain. Allowed: gmail.com, outlook.com, etc.' });
     }
@@ -97,7 +99,8 @@ const registerUser = async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const loginUser = async (req, res) => {
-    const { email, password } = req.body;
+    let { email, password } = req.body;
+    email = email.toLowerCase();
 
     // Check for user email
     const user = await User.findOne({ email });
@@ -112,6 +115,7 @@ const loginUser = async (req, res) => {
             _id: user.id,
             name: user.name,
             email: user.email,
+            role: user.role,
             token: generateToken(user.id),
         });
     } else {
@@ -133,10 +137,14 @@ const updateProfile = async (req, res) => {
             return res.status(404).json({ message: 'User not found' });
         }
 
-        // Update password if provided
+        // Update Password if provided
         if (password) {
+            if (!validatePassword(password)) {
+                return res.status(400).json({ message: 'Password must be at least 8 chars, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.' });
+            }
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(password, salt);
+            console.log(`[DEBUG] Profile Update: Password changed for ${user.email}`);
         }
 
         // Update Phone
@@ -225,11 +233,73 @@ const getUserCount = async (req, res) => {
     }
 };
 
+// @desc    Forgot Password (Generate OTP)
+// @route   POST /api/auth/forgot-password
+// @access  Public
+const forgotPassword = async (req, res) => {
+    let { email } = req.body;
+    email = email.toLowerCase();
+    try {
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Generate 6 digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        user.otp = otp;
+        user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+        await user.save();
+
+        console.log(`[DEV MODE] Password Reset OTP for ${email}: ${otp}`);
+
+        res.json({ message: 'OTP sent to email (Check server console for Dev Mode)' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
+// @desc    Reset Password (Verify OTP)
+// @route   POST /api/auth/reset-password
+// @access  Public
+const resetPassword = async (req, res) => {
+    let { email, otp, newPassword } = req.body;
+    email = email.toLowerCase();
+    try {
+        const user = await User.findOne({
+            email,
+            otp,
+            otpExpires: { $gt: Date.now() }
+        });
+
+        if (!user) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        if (!validatePassword(newPassword)) {
+            return res.status(400).json({ message: 'Password must be at least 8 chars, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        user.otp = undefined;
+        user.otpExpires = undefined;
+        await user.save();
+        console.log(`[DEBUG] Password reset for ${email}. New Hash: ${user.password}`);
+
+        res.json({ message: 'Password reset successful' });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error', error: error.message });
+    }
+};
+
 module.exports = {
     registerUser,
     loginUser,
     updateProfile,
     getProfile,
     updateCommunityRead,
-    getUserCount
+    getUserCount,
+    forgotPassword,
+    resetPassword
 };
