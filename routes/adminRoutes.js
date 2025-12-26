@@ -45,6 +45,22 @@ router.put('/users/:id/verify', protect, adminMiddleware, async (req, res) => {
     }
 });
 
+// Delete user
+router.delete('/users/:id', protect, adminMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (user) {
+            await user.deleteOne();
+            console.log(`Admin deleted user: ${user.email}`);
+            res.json({ message: 'User removed' });
+        } else {
+            res.status(404).json({ message: 'User not found' });
+        }
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
 // Get all complaints
 router.get('/complaints', protect, adminMiddleware, async (req, res) => {
     try {
