@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Notice = require('../models/Notice');
 const { protect } = require('../middleware/authMiddleware');
-const { adminMiddleware } = require('../middleware/authMiddleware');
+const adminMiddleware = require('../middleware/adminMiddleware');
 
 // Get all notices (Protected for all users)
 router.get('/', protect, async (req, res) => {
