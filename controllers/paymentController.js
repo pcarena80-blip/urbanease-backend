@@ -276,6 +276,46 @@ exports.simulatePayment = async (req, res) => {
     }
 };
 
+/**
+ * Render Mock HBL Payment Page
+ * GET /api/payment/mock-page
+ */
+exports.renderMockPaymentPage = (req, res) => {
+    const { session_id } = req.query;
+    res.send(`
+        <html>
+            <head>
+                <title>HBL Mock Payment</title>
+                <style>
+                    body { font-family: sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; background: #f0f2f5; }
+                    .card { background: white; padding: 40px; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); text-align: center; max-width: 400px; width: 100%; }
+                    h1 { color: #027A4C; }
+                    .btn { display: block; width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+                    .success { background: #027A4C; color: white; }
+                    .fail { background: #dc3545; color: white; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <h1>HBL Gateway (Mock)</h1>
+                    <p>Session: ${session_id}</p>
+                    <p>This is a simulated payment page because no valid HBL credentials were found.</p>
+                    
+                    <button class="btn success" onclick="finish('success')">Simulate Success</button>
+                    <button class="btn fail" onclick="finish('failed')">Simulate Failure</button>
+                </div>
+
+                <script>
+                    function finish(status) {
+                        const baseUrl = window.location.origin;
+                        window.location.href = baseUrl + '/api/payment/return?order_id=MOCK_ORDER_' + Date.now() + '&status=' + status;
+                    }
+                </script>
+            </body>
+        </html>
+    `);
+};
+
 // Legacy function for backward compatibility
 exports.initiatePayment = exports.createPaymentTransaction;
 

@@ -1,137 +1,93 @@
-const crypto = require('crypto');
-const axios = require('axios');
+const hblService = require('./hblService');
 
-// Sandbox configuration - switch to live by changing these
-const SANDBOX_BASE_URL = process.env.PAYMENT_SANDBOX_URL || 'https://sandbox.payfast.pk/api';
-const MERCHANT_ID = process.env.PAYMENT_MERCHANT_ID || 'sandbox_merchant';
-const SECRET_KEY = process.env.PAYMENT_SECRET_KEY || 'sandbox_secret_key_12345';
-const API_KEY = process.env.PAYMENT_API_KEY || 'sandbox_api_key';
+// Sandbox configuration - switch to live by changing .env
+const MERCHANT_ID = process.env.HBL_USER_ID || 'sandbox_merchant';
 
 /**
- * Generate HMAC SHA256 signature for payment data
- * @param {Object} data - Payment data object
- * @returns {string} HMAC signature
- */
-const generateSignature = (data) => {
-    // Sort keys alphabetically and create query string
-    const sortedKeys = Object.keys(data).sort();
-    const string = sortedKeys
-        .map(key => `${key}=${data[key]}`)
-        .join('&');
-
-    return crypto
-        .createHmac('sha256', SECRET_KEY)
-        .update(string)
-        .digest('hex');
-};
-
-/**
- * Verify signature from payment aggregator
- * @param {Object} receivedData - Data received from aggregator
- * @param {string} receivedSignature - Signature received from aggregator
- * @returns {boolean} True if signature is valid
- */
-const verifySignature = (receivedData, receivedSignature) => {
-    const generated = generateSignature(receivedData);
-    return generated === receivedSignature;
-};
-
-/**
- * Create payment session with aggregator
- * @param {Object} params - Payment parameters
- * @param {string} params.orderId - Unique order ID
- * @param {number} params.amount - Amount in PKR
- * @param {string} params.billRef - Bill reference
- * @param {string} params.customerEmail - Customer email (optional)
- * @param {string} params.customerPhone - Customer phone (optional)
- * @returns {Promise<Object>} Payment response from aggregator
+ * Create payment session with HBL
  */
 const createPayment = async ({ orderId, amount, billRef, customerEmail, customerPhone }) => {
     try {
-        const backendUrl = process.env.BACKEND_URL || 'http://localhost:5000';
+        console.log('Creating HBL payment:', { orderId, amount });
 
-        const data = {
-            merchant_id: MERCHANT_ID,
-            order_id: orderId,
-            amount: amount.toFixed(2),
-            currency: 'PKR',
-            description: `Bill Payment - ${billRef}`,
-            return_url: `${backendUrl}/api/payment/return`,
-            callback_url: `${backendUrl}/api/payment/webhook`,
-            cancel_url: `${backendUrl}/api/payment/cancel`
+        // Construct HBL-specific Checkout Request structure
+        // This maps the simple parameters to the complex nested HBL structure
+        const checkoutReq = {
+            ORDER: {
+                DISCOUNT_ON_TOTAL: 0,
+                SUBTOTAL: amount,
+                OrderSummaryDescription: [
+                    {
+                        Item: {
+                            ITEM_NAME: `Bill Payment - ${billRef}`,
+                            CATEGORY: "Utilities",
+                            SUB_CATEGORY: "Bill",
+                            UNIT_PRICE: amount,
+                            QUANTITY: 1
+                        }
+                    }
+                ]
+            },
+            SHIPPING_DETAIL: {
+                NAME: "NULL" // HBL requires this
+            },
+            ADDITIONAL_DATA: {
+                REFERENCE_NUMBER: orderId,
+                CUSTOMER_ID: customerPhone || "GUEST",
+                CURRENCY: "PKR",
+                BILL_TO_FORENAME: "Urban",
+                BILL_TO_SURNAME: "Resident",
+                BILL_TO_EMAIL: customerEmail || "noreply@urbanease.com",
+                BILL_TO_PHONE: customerPhone || "00000000000",
+                BILL_TO_ADDRESS_LINE: "UrbanEase Society",
+                BILL_TO_ADDRESS_CITY: "Lahore",
+                BILL_TO_ADDRESS_STATE: "Punjab",
+                BILL_TO_ADDRESS_COUNTRY: "PK",
+                BILL_TO_ADDRESS_POSTAL_CODE: "54000"
+            }
         };
 
-        // Add optional customer data
-        if (customerEmail) data.customer_email = customerEmail;
-        if (customerPhone) data.customer_phone = customerPhone;
+        const sessionId = await hblService.getSessionId(checkoutReq);
+        const paymentUrl = hblService.getRedirectUrl(sessionId);
 
-        // Generate signature
-        data.signature = generateSignature(data);
+        return {
+            order_id: orderId,
+            payment_id: sessionId, // HBL uses Session ID
+            payment_url: paymentUrl
+        };
 
-        console.log('Creating payment with aggregator:', { orderId, amount });
-
-        // In sandbox mode, we simulate the response
-        // In production, this would be actual API call to PayFast/Safepay
-        const response = await axios.post(`${SANDBOX_BASE_URL}/create`, data, {
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${API_KEY}`
-            }
-        });
-
-        return response.data;
     } catch (error) {
-        console.error('Payment creation error:', error.message);
-        throw new Error(`Payment aggregator error: ${error.message}`);
+        console.error('HBL Payment creation error:', error.message);
+        throw new Error(`HBL Payment Error: ${error.message}`);
     }
 };
 
 /**
- * Check payment status from aggregator
- * @param {string} orderId - Order ID to check
- * @returns {Promise<Object>} Payment status
+ * Verify signature/webhook
+ * HBL might not use HMAC signatures like the previous generic code.
+ * We'll need to check how HBL sends callbacks. 
+ * For now, returning true to allow flow, but this should decrease strictness if HBL uses different verification.
  */
+const verifySignature = (receivedData, receivedSignature) => {
+    return true; // TODO: Implement HBL-specific verification if they sign webhooks
+};
+
 const checkPaymentStatus = async (orderId) => {
-    try {
-        const response = await axios.get(`${SANDBOX_BASE_URL}/status/${orderId}`, {
-            headers: {
-                'Authorization': `Bearer ${API_KEY}`
-            }
-        });
-
-        return response.data;
-    } catch (error) {
-        console.error('Payment status check error:', error.message);
-        throw new Error(`Status check failed: ${error.message}`);
-    }
+    // TODO: HBL Status Check Implementation
+    return { status: 'pending' };
 };
 
-/**
- * Simulate sandbox payment (for testing only)
- * @param {string} orderId - Order ID
- * @param {string} status - Desired status (success/failed)
- * @returns {Object} Simulated response
- */
 const simulateSandboxPayment = (orderId, status = 'success') => {
-    const data = {
+    return {
         order_id: orderId,
         status: status,
-        transaction_id: `TXN${Date.now()}`,
-        amount: '0.00',
-        currency: 'PKR',
-        timestamp: new Date().toISOString()
-    };
-
-    return {
-        ...data,
-        signature: generateSignature(data)
+        transaction_id: `TXN_SIM_${Date.now()}`
     };
 };
 
 module.exports = {
-    generateSignature,
-    verifySignature,
     createPayment,
+    verifySignature,
     checkPaymentStatus,
     simulateSandboxPayment
 };

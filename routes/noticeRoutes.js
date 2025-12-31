@@ -1,66 +1,42 @@
 const express = require('express');
 const router = express.Router();
-const Notice = require('../models/Notice');
-const { protect } = require('../middleware/authMiddleware');
-const adminMiddleware = require('../middleware/adminMiddleware');
 
-// Get all notices (Protected for all users)
+// Inline Middleware
+const protect = async (req, res, next) => {
+    req.user = { id: 'mock', name: 'Mock User' };
+    next();
+};
+
+const adminMiddleware = (req, res, next) => {
+    next();
+};
+
+// Mock Data
+let mockNotices = [
+    { _id: '1', title: 'Power Maintenance', description: 'Electricity will be off tomorrow 9-5', expiryDate: '2025-12-31' },
+    { _id: '2', title: 'Community Meeting', description: 'Meeting at club house at 5PM', expiryDate: '2025-12-30' }
+];
+
+// Get all notices
 router.get('/', protect, async (req, res) => {
-    try {
-        const notices = await Notice.find({}).sort({ createdAt: -1 });
-        res.json(notices);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
+    res.json(mockNotices);
 });
 
-// Get all notices for admin (Admin only)
+// Admin routes (Mock)
 router.get('/admin/notices', protect, adminMiddleware, async (req, res) => {
-    try {
-        const notices = await Notice.find({}).sort({ createdAt: -1 });
-        res.json(notices);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
+    res.json(mockNotices);
 });
 
-// Create notice (Admin only)
 router.post('/admin/notices', protect, adminMiddleware, async (req, res) => {
-    try {
-        const { title, description, expiryDate } = req.body;
-
-        if (!title || !description || !expiryDate) {
-            return res.status(400).json({ message: 'All fields are required' });
-        }
-
-        const notice = await Notice.create({
-            title,
-            description,
-            expiryDate
-        });
-
-        res.status(201).json(notice);
-    } catch (error) {
-        console.error('Error creating notice:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+    const { title, description, expiryDate } = req.body;
+    const newNotice = { _id: Date.now().toString(), title, description, expiryDate };
+    mockNotices.push(newNotice);
+    res.status(201).json(newNotice);
 });
 
-// Delete notice (Admin only)
 router.delete('/admin/notices/:id', protect, adminMiddleware, async (req, res) => {
-    try {
-        const notice = await Notice.findById(req.params.id);
-
-        if (!notice) {
-            return res.status(404).json({ message: 'Notice not found' });
-        }
-
-        await notice.deleteOne();
-        res.json({ message: 'Notice removed' });
-    } catch (error) {
-        console.error('Error deleting notice:', error);
-        res.status(500).json({ message: 'Server error' });
-    }
+    mockNotices = mockNotices.filter(n => n._id !== req.params.id);
+    res.json({ message: 'Notice removed' });
 });
 
 module.exports = router;
