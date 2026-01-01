@@ -41,6 +41,7 @@ app.use('/api/notices', require('./routes/noticeRoutes'));
 app.use('/api/bills', require('./routes/billRoutes'));
 app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/admin', require('./routes/adminRoutes'));
 
 // Default Route
 app.get('/', (req, res) => {

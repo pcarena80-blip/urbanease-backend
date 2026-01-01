@@ -6,7 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
 // const BASE_URL = 'https://musicians-index-vector-reef.trycloudflare.com/api';
 // AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
-const BASE_URL = 'https://broke-anticipated-completed-claire.trycloudflare.com/api';
+const BASE_URL = 'https://merely-feof-brighton-llc.trycloudflare.com/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Localtunnel)

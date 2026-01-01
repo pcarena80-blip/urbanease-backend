@@ -31,7 +31,7 @@ export function BillsPayments() {
   const handleDispatch = async () => {
     setProcessing(true);
     try {
-      await api.post('/bills/dispatch', dispatchData);
+      await api.post('/admin/bills/dispatch', dispatchData);
       alert('Bills generated successfully for all verified residents');
       setShowDispatchModal(false);
       fetchBills();
@@ -44,7 +44,7 @@ export function BillsPayments() {
 
   const fetchBills = async () => {
     try {
-      const response = await api.get('/bills');
+      const response = await api.get('/admin/bills');
       setBills(response.data);
     } catch (error) {
       console.error("Failed to fetch bills", error);
@@ -60,7 +60,7 @@ export function BillsPayments() {
   const handleToggleStatus = async (bill: Bill) => {
     const newStatus = bill.status === 'paid' ? 'due' : 'paid';
     try {
-      await api.put(`/bills/${bill._id}/status`, { status: newStatus });
+      await api.put(`/admin/bills/${bill._id}/status`, { status: newStatus });
       // Refresh list locally
       setBills(bills.map(b => b._id === bill._id ? { ...b, status: newStatus, paidDate: newStatus === 'paid' ? new Date().toISOString() : undefined } : b));
     } catch (error) {

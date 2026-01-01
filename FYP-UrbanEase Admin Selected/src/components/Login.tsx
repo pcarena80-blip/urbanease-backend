@@ -34,7 +34,14 @@ export function Login({ onLoginSuccess }: LoginProps) {
             localStorage.setItem('adminUser', JSON.stringify(userData));
             onLoginSuccess();
         } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed. Please check your credentials.');
+            console.error('Login Error:', err);
+            if (err.response) {
+                setError(err.response.data?.message || `Login failed: Server responded with status ${err.response.status}`);
+            } else if (err.request) {
+                setError('Login failed: No response from server. Check your internet connection.');
+            } else {
+                setError(`Login failed: ${err.message}`);
+            }
         } finally {
             setLoading(false);
         }

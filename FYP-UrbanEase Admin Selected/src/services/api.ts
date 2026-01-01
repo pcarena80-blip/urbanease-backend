@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL || 'https://broke-anticipated-completed-claire.trycloudflare.com/api',
+    baseURL: import.meta.env.VITE_API_URL || 'https://merely-feof-brighton-llc.trycloudflare.com/api',
     headers: {
         'Content-Type': 'application/json',
     },
