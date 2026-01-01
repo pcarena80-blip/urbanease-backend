@@ -1,9 +1,11 @@
 const express = require('express');
 const router = express.Router();
-const { getAllBills, generateBill, payBill } = require('../controllers/billController');
+const { getAllBills, dispatchBills, payBill, getBillById } = require('../controllers/billController');
+const { protect } = require('../middleware/authMiddleware');
 
-router.route('/').get(getAllBills);
-router.route('/generate').post(generateBill); // New Flow
+router.route('/').get(protect, getAllBills);
+router.route('/dispatch').post(dispatchBills); // Admin only (add admin protect later if needed)
 router.route('/pay').post(payBill);
+router.route('/:id').get(protect, getBillById);
 
 module.exports = router;

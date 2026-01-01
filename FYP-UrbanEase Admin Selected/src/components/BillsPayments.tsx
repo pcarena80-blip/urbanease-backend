@@ -23,10 +23,9 @@ export function BillsPayments() {
   const [showDispatchModal, setShowDispatchModal] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [dispatchData, setDispatchData] = useState({
-    type: 'Maintenance',
+    types: [] as string[],
     month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
-    amount: 5000,
-    dueDate: ''
+    dueDate: new Date(new Date().setDate(new Date().getDate() + 10)).toISOString().split('T')[0]
   });
 
   const handleDispatch = async () => {
@@ -85,14 +84,41 @@ export function BillsPayments() {
             <div className={`p-6 rounded-xl w-full max-w-md ${theme === 'dark' ? 'bg-[#1F1F1F] text-white' : 'bg-white text-gray-900'}`}>
               <h3 className="text-xl font-semibold mb-4">Dispatch Monthly Bills</h3>
               <div className="space-y-4">
-                <input className="w-full p-2 rounded border bg-transparent" placeholder="Bill Type (e.g. Maintenance)" value={dispatchData.type} onChange={e => setDispatchData({ ...dispatchData, type: e.target.value })} />
-                <input className="w-full p-2 rounded border bg-transparent" placeholder="Month (e.g. January 2025)" value={dispatchData.month} onChange={e => setDispatchData({ ...dispatchData, month: e.target.value })} />
-                <input className="w-full p-2 rounded border bg-transparent" type="number" placeholder="Amount" value={dispatchData.amount} onChange={e => setDispatchData({ ...dispatchData, amount: Number(e.target.value) })} />
-                <input className="w-full p-2 rounded border bg-transparent" type="date" placeholder="Due Date" value={dispatchData.dueDate} onChange={e => setDispatchData({ ...dispatchData, dueDate: e.target.value })} />
+
+                {/* Multi-Select Types */}
+                <div>
+                  <label className="block text-sm mb-2 text-gray-400">Select Bill Types</label>
+                  <div className="flex gap-4">
+                    {['Electricity', 'Gas', 'Maintenance'].map(type => (
+                      <label key={type} className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={dispatchData.types.includes(type)}
+                          onChange={(e) => {
+                            if (e.target.checked) setDispatchData({ ...dispatchData, types: [...dispatchData.types, type] });
+                            else setDispatchData({ ...dispatchData, types: dispatchData.types.filter(t => t !== type) });
+                          }}
+                          className="rounded border-gray-600 bg-transparent text-green-500 focus:ring-green-500"
+                        />
+                        <span>{type}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm mb-1 text-gray-400">Billing Month</label>
+                  <input className="w-full p-2 rounded border border-gray-600 bg-transparent" placeholder="e.g. January 2025" value={dispatchData.month} onChange={e => setDispatchData({ ...dispatchData, month: e.target.value })} />
+                </div>
+
+                <div>
+                  <label className="block text-sm mb-1 text-gray-400">Due Date</label>
+                  <input className="w-full p-2 rounded border border-gray-600 bg-transparent" type="date" value={dispatchData.dueDate} onChange={e => setDispatchData({ ...dispatchData, dueDate: e.target.value })} />
+                </div>
 
                 <div className="flex gap-2 justify-end mt-6">
                   <button onClick={() => setShowDispatchModal(false)} className="px-4 py-2 rounded bg-gray-500 text-white">Cancel</button>
-                  <button onClick={handleDispatch} disabled={processing} className="px-4 py-2 rounded bg-green-600 text-white">
+                  <button onClick={handleDispatch} disabled={processing || dispatchData.types.length === 0} className="px-4 py-2 rounded bg-green-600 text-white disabled:opacity-50">
                     {processing ? 'Processing...' : 'Dispatch All'}
                   </button>
                 </div>
