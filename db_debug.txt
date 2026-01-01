@@ -1,0 +1,8 @@
+Checking URI: mongodb+srv://admin:...
+Connected.
+Users in Atlas DB: 5
+- Saim (saim@gmail.com) [Role: user]
+- Syed Adeen Sarosh  (syedadeen18@gmail.com) [Role: user]
+- Umair Masood (umair@gmail.com) [Role: user]
+- Masroor Ahmed  (masroor@gmail.com) [Role: user]
+- Super Admin (admin@urbanease.com) [Role: superadmin]
