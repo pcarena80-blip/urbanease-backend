@@ -1,4 +1,84 @@
 const Bill = require('../models/Bill');
+const User = require('../models/User');
+
+// @desc    Dispatch monthly bills to all verified residents
+// @route   POST /api/bills/dispatch
+// @access  Admin
+exports.dispatchBills = async (req, res) => {
+    const { types, month, dueDate } = req.body;
+
+    if (!types || !Array.isArray(types) || types.length === 0 || !month || !dueDate) {
+        return res.status(400).json({ message: 'Please provide bill types, month, and due date' });
+    }
+
+    try {
+        // Get all verified residents
+        const residents = await User.find({ isVerified: true, role: { $ne: 'admin' } });
+
+        if (residents.length === 0) {
+            return res.status(400).json({ message: 'No verified residents found' });
+        }
+
+        let createdBills = 0;
+        let skippedBills = 0;
+
+        for (const resident of residents) {
+            for (const type of types) {
+                // Check if bill already exists for this resident, type, and month
+                const existingBill = await Bill.findOne({
+                    consumerId: resident._id,
+                    type: type,
+                    month: month
+                });
+
+                if (existingBill) {
+                    skippedBills++;
+                    continue;
+                }
+
+                // Generate random amount based on type
+                let amount;
+                switch (type) {
+                    case 'electricity':
+                        amount = Math.floor(Math.random() * 3000) + 2000; // 2000-5000
+                        break;
+                    case 'gas':
+                        amount = Math.floor(Math.random() * 1500) + 500; // 500-2000
+                        break;
+                    case 'maintenance':
+                        amount = 1500; // Fixed maintenance fee
+                        break;
+                    default:
+                        amount = 1000;
+                }
+
+                // Create the bill
+                await Bill.create({
+                    consumerId: resident._id,
+                    type: type,
+                    amount: amount,
+                    month: month,
+                    dueDate: new Date(dueDate),
+                    status: 'unpaid',
+                    refNo: `${type.toUpperCase().substring(0, 3)}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+                });
+
+                createdBills++;
+            }
+        }
+
+        res.status(201).json({
+            message: `Dispatched ${createdBills} bills successfully`,
+            created: createdBills,
+            skipped: skippedBills,
+            residents: residents.length
+        });
+
+    } catch (error) {
+        console.error('Dispatch error:', error);
+        res.status(500).json({ message: 'Dispatch failed: ' + error.message });
+    }
+};
 
 // @desc    Get all bills (Admin or User's own)
 // @route   GET /api/bills
