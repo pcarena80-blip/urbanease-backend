@@ -183,7 +183,7 @@ export function Complaints() {
                     <h5 className={`mb-2 text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Attachment</h5>
                     <div className="rounded-lg overflow-hidden border border-gray-200 inline-block">
                       <img
-                        src={complaint.image.startsWith('http') ? complaint.image : `http://localhost:5000/${complaint.image.replace(/\\/g, '/')}`}
+                        src={complaint.image.startsWith('http') ? complaint.image : `https://musicians-index-vector-reef.trycloudflare.com/${complaint.image.replace(/\\/g, '/')}`}
                         alt="Complaint Attachment"
                         className="max-w-full h-auto max-h-64 object-contain"
                         onError={(e) => {

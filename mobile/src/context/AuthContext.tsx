@@ -26,7 +26,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
         // Listen for app state changes to refresh data when app comes to foreground
         const subscription = AppState.addEventListener('change', (nextAppState) => {
-            if (nextAppState === 'active' && user) {
+            if (nextAppState === 'active') {
                 // App became active, refresh data in background
                 prefetchAppData();
             }
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => {
             subscription?.remove();
         };
-    }, [user]);
+    }, []);
 
     const loadStorageData = async () => {
         try {
@@ -54,6 +54,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const prefetchAppData = async () => {
+        if (prefetching) return;
         setPrefetching(true);
         try {
             console.log('Prefetching app data...');
@@ -69,11 +70,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const [notices, bills, complaints, communityMessages, inbox] = await Promise.all(promises);
 
             // Cache data in AsyncStorage for instant load next time
-            await AsyncStorage.setItem('cachedNotices', JSON.stringify(notices));
-            await AsyncStorage.setItem('cachedBills', JSON.stringify(bills));
-            await AsyncStorage.setItem('cachedComplaints', JSON.stringify(complaints));
-            await AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(communityMessages));
-            await AsyncStorage.setItem('cachedInbox', JSON.stringify(inbox));
+            if (notices) await AsyncStorage.setItem('cachedNotices', JSON.stringify(notices));
+            if (bills) await AsyncStorage.setItem('cachedBills', JSON.stringify(bills));
+            if (complaints) await AsyncStorage.setItem('cachedComplaints', JSON.stringify(complaints));
+            if (communityMessages) await AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(communityMessages));
+            if (inbox) await AsyncStorage.setItem('cachedInbox', JSON.stringify(inbox));
 
             console.log('Data prefetch complete!');
         } catch (error) {

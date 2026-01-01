@@ -174,12 +174,12 @@ export default function ComplaintsScreen() {
             No complaints found in this category.
           </Text>
         ) : (
-          filteredComplaints.map((complaint) => {
+          filteredComplaints.map((complaint, index) => {
             const priorityConfig = getPriorityConfig(complaint.priority);
 
             return (
               <TouchableOpacity
-                key={complaint.id}
+                key={complaint._id || complaint.id || index}
                 onPress={() => navigation.navigate('ComplaintDetails', { complaint })}
                 className="bg-white rounded-2xl p-4 shadow-sm mb-3"
               >

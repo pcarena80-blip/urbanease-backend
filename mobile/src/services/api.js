@@ -2,23 +2,46 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Production Render URL
-// Production Render URL
-const BASE_URL = 'https://urbanease-backend-suham.onrender.com/api';
-// Local Development URL
+// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
+// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
+// const BASE_URL = 'https://musicians-index-vector-reef.trycloudflare.com/api';
+// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
+const BASE_URL = 'https://broke-anticipated-completed-claire.trycloudflare.com/api';
+// Local Network Dev (Localtunnel)
+// const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
+// Local Network Dev (Localtunnel)
+// const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
+// Local Network Dev (Direct WiFi)
 // const BASE_URL = 'http://192.168.18.131:5000/api';
+// Cloud Production (Any WiFi/4G)
+// const BASE_URL = 'https://urbanease-backend-suham.onrender.com/api';
+console.log('🌐 API BASE_URL:', BASE_URL);
+
+// Previous URLs (for reference)
+// AWS Direct HTTP: 'http://51.20.34.254:5000/api' (blocked by Android)
+// Local Dev: 'http://192.168.18.131:5000/api'
+// Render Backup: 'https://urbanease-backend-suham.onrender.com/api'
 
 const getHeaders = async () => {
     const token = await AsyncStorage.getItem('token');
     return {
         'Content-Type': 'application/json',
         'Authorization': token ? `Bearer ${token}` : '',
+        'Bypass-Tunnel-Reminder': 'true',
     };
 };
 
 // Helper function for better error handling
-const handleApiError = (error, endpoint) => {
+const handleApiError = async (error, endpoint) => {
     console.error(`❌ API Error [${endpoint}]:`, error);
+
+    // Auto-logout on 401 errors (invalid/expired token)
+    if (error.message.includes('Not authorized') || error.message.includes('401')) {
+        console.log('🔑 Token invalid - clearing authentication');
+        await AsyncStorage.removeItem('token');
+        await AsyncStorage.removeItem('user');
+        // The app will redirect to login automatically
+    }
 
     if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
         throw new Error('Cannot connect to server. Please check your internet connection.');
@@ -31,37 +54,74 @@ const handleApiError = (error, endpoint) => {
     throw error;
 };
 
+// Global request helper to handle errors centralized
+const request = async (endpoint, options = {}, retries = 3) => {
+    try {
+        const response = await fetch(`${BASE_URL}${endpoint}`, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...options.headers,
+            },
+        });
+
+        // Handle 401 Unauthorized globally
+        if (response.status === 401) {
+            console.log('🔑 Authentication failed (401) - Logging out...');
+            await AsyncStorage.removeItem('token');
+            await AsyncStorage.removeItem('user');
+            throw new Error('Not authorized');
+        }
+
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data.message || 'API Request Failed');
+            }
+            return data;
+        } else {
+            // Handle non-JSON responses (Cloudflare 502 Bad Gateway or Local 404)
+            const text = await response.text();
+            console.error(`❌ Non-JSON Response [${response.status}]:`, text.substring(0, 200));
+
+            if (text.startsWith('Bad Gateway') || response.status === 502) {
+                if (retries > 0) {
+                    const delay = (4 - retries) * 1000 * 2;
+                    console.log(`♻️ Server overloaded (502). Retrying in ${delay / 1000}s... (${retries} left)`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    return request(endpoint, options, retries - 1);
+                }
+                throw new Error('Server is warming up. Please wait a minute and pull to refresh.');
+            }
+            // Throw HTML content as error to see it on screen
+            throw new Error(`Server Error (${response.status}): ${text.substring(0, 100)}...`);
+        }
+    } catch (error) {
+        // If network request failed (e.g. timeout), also retry
+        if (retries > 0 && (error.message.includes('Network request failed') || error.message.includes('timeout') || error.message.includes('busy'))) {
+            const delay = (4 - retries) * 1000 * 2;
+            console.log(`♻️ Network/Server error. Retrying in ${delay / 1000}s... (${retries} left)`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return request(endpoint, options, retries - 1);
+        }
+        return handleApiError(error, endpoint);
+    }
+};
+
 export const api = {
     auth: {
         login: async (email, password) => {
-            try {
-                const response = await fetch(`${BASE_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password }),
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Login failed');
-                return data;
-            } catch (error) {
-                throw error;
-            }
+            return request('/auth/login', {
+                method: 'POST',
+                body: JSON.stringify({ email, password }),
+            });
         },
         signup: async (userData) => {
-            try {
-                const response = await fetch(`${BASE_URL}/auth/signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userData),
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Signup failed');
-                return data;
-            } catch (error) {
-                throw error;
-            }
+            return request('/auth/signup', {
+                method: 'POST',
+                body: JSON.stringify(userData),
+            });
         },
         logout: async () => {
             await AsyncStorage.removeItem('token');
@@ -100,169 +160,97 @@ export const api = {
     },
     bills: {
         getAll: async () => {
-            const response = await fetch(`${BASE_URL}/bills`, { headers: await getHeaders() });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to fetch bills');
-            return data;
+            return request('/bills', { headers: await getHeaders() });
         },
-        pay: async (id, paymentDetails) => {
-            // This would likely update the bill status
-            const response = await fetch(`${BASE_URL}/bills/${id}`, {
-                method: 'PUT',
+        generate: async (type) => {
+            // type: 'electricity', 'gas', 'maintenance'
+            return request('/bills/generate', {
+                method: 'POST',
                 headers: await getHeaders(),
-                body: JSON.stringify(paymentDetails) // Assuming backend supports updates
+                body: JSON.stringify({ type })
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to pay bill');
-            return data;
+        },
+        pay: async (paymentData) => {
+            // paymentData: { referenceId, paymentMethod, mobileNumber, amount }
+            return request('/bills/pay', {
+                method: 'POST',
+                headers: await getHeaders(),
+                body: JSON.stringify(paymentData)
+            });
         }
     },
     complaints: {
         getAll: async () => {
-            try {
-                console.log('🎫 Fetching complaints from:', `${BASE_URL}/complaints`);
-                const response = await fetch(`${BASE_URL}/complaints`, { headers: await getHeaders() });
-                const data = await response.json();
-                console.log('🎫 Complaints response:', { status: response.status, count: data?.length });
-                if (!response.ok) {
-                    console.error('❌ Complaints fetch failed:', data);
-                    throw new Error(data.message || 'Failed to fetch complaints');
-                }
-                return data;
-            } catch (error) {
-                handleApiError(error, 'complaints.getAll');
-            }
+            return request('/complaints', { headers: await getHeaders() });
         },
         create: async (complaintData) => {
-            const token = await AsyncStorage.getItem('token');
-            const headers = {
-                'Authorization': token ? `Bearer ${token}` : '',
-            };
-
-            // Remove Content-Type header if sending FormData (let browser/network handle boundary)
-            if (!(complaintData instanceof FormData)) {
-                headers['Content-Type'] = 'application/json';
+            const headers = await getHeaders();
+            // Remove Content-Type if FormData to let browser set boundary
+            if (complaintData instanceof FormData) {
+                delete headers['Content-Type'];
             }
-
-            const response = await fetch(`${BASE_URL}/complaints`, {
+            return request('/complaints', {
                 method: 'POST',
                 headers: headers,
                 body: complaintData instanceof FormData ? complaintData : JSON.stringify(complaintData)
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to create complaint');
-            return data;
         }
     },
     chat: {
-        // Assuming community chat doesn't need a specific userId or it's a specific route
-        // The backend route was /:userId for GET. If it's community, maybe it's a fixed ID or different route?
-        // For now assuming a general fetch
         getMessages: async (userId) => {
-            const response = await fetch(`${BASE_URL}/chat/${userId}`, { headers: await getHeaders() });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to fetch messages');
-            return data;
+            return request(`/chat/${userId}`, { headers: await getHeaders() });
         },
         getInbox: async () => {
-            const response = await fetch(`${BASE_URL}/chat/inbox`, { headers: await getHeaders() });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to fetch inbox');
-            return data;
+            return request('/chat/inbox', { headers: await getHeaders() });
         },
         sendMessage: async (messageData) => {
-            const token = await AsyncStorage.getItem('token');
-            const headers = {
-                'Authorization': token ? `Bearer ${token}` : '',
-            };
-
+            const headers = await getHeaders();
             let body = messageData;
-            if (!(messageData instanceof FormData)) {
-                const formData = new FormData();
-                Object.keys(messageData).forEach(key => {
-                    formData.append(key, messageData[key]);
-                });
-                body = formData;
+            if (messageData instanceof FormData) {
+                delete headers['Content-Type'];
+                body = messageData;
+            } else if (!(messageData instanceof FormData)) {
+                // If simple object convert to body? No, request handles json stringify?
+                // request helper expects body to be string or FormData?
+                // request helper just passes body.
+                if (!(messageData instanceof FormData)) {
+                    body = JSON.stringify(messageData);
+                }
             }
+            // fix logic above:
+            // The original logic checked instanceof FormData.
 
-            const response = await fetch(`${BASE_URL}/chat`, {
+            return request('/chat', {
                 method: 'POST',
                 headers: headers,
                 body: body
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to send message');
-            return data;
         },
         deleteMessage: async (messageId) => {
-            try {
-                console.log('🗑️ Deleting message:', messageId);
-                const response = await fetch(`${BASE_URL}/chat/${messageId}`, {
-                    method: 'DELETE',
-                    headers: await getHeaders()
-                });
-                const data = await response.json();
-                console.log('🗑️ Delete response:', { status: response.status });
-                if (!response.ok) {
-                    console.error('❌ Delete failed:', data);
-                    throw new Error(data.message || 'Failed to delete message');
-                }
-                return data;
-            } catch (error) {
-                handleApiError(error, 'chat.deleteMessage');
-            }
+            return request(`/chat/${messageId}`, {
+                method: 'DELETE',
+                headers: await getHeaders()
+            });
         }
     },
     notices: {
         getAll: async () => {
-            try {
-                console.log('📋 Fetching notices from:', `${BASE_URL}/notices`);
-                const response = await fetch(`${BASE_URL}/notices`, { headers: await getHeaders() });
-                const data = await response.json();
-                console.log('📋 Notices response:', { status: response.status, count: data?.length });
-                if (!response.ok) {
-                    console.error('❌ Notices fetch failed:', data);
-                    throw new Error(data.message || 'Failed to fetch notices');
-                }
-                return data;
-            } catch (error) {
-                handleApiError(error, 'notices.getAll');
-            }
+            return request('/notices', { headers: await getHeaders() });
         }
     },
     profile: {
         get: async () => {
-            try {
-                console.log('👤 Fetching profile from:', `${BASE_URL}/profile`);
-                const token = await AsyncStorage.getItem('token');
-                console.log('👤 Token exists:', !!token);
-                const response = await fetch(`${BASE_URL}/profile`, { headers: await getHeaders() });
-                const data = await response.json();
-                console.log('👤 Profile response:', { status: response.status, hasData: !!data });
-                if (!response.ok) {
-                    console.error('❌ Profile fetch failed:', data);
-                    throw new Error(data.message || 'Failed to fetch profile');
-                }
-                return data;
-            } catch (error) {
-                handleApiError(error, 'profile.get');
-            }
+            return request('/profile', { headers: await getHeaders() });
         },
         getById: async (id) => {
-            const response = await fetch(`${BASE_URL}/profile/${id}`, { headers: await getHeaders() });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to fetch user profile');
-            return data;
+            return request(`/profile/${id}`, { headers: await getHeaders() });
         },
         update: async (profileData) => {
-            const response = await fetch(`${BASE_URL}/profile`, {
+            return request('/profile', {
                 method: 'PUT',
                 headers: await getHeaders(),
                 body: JSON.stringify(profileData)
             });
-            const data = await response.json();
-            if (!response.ok) throw new Error(data.message || 'Failed to update profile');
-            return data;
         }
     },
     // Helper for image URLs

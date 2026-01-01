@@ -8,7 +8,8 @@ import {
   Edit,
   Lock,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  ArrowLeft
 } from "lucide-react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -48,12 +49,14 @@ export default function ProfileScreen() {
         ]
       );
       // Set minimal profile data so UI can still render logout option
-      setProfile({
-        name: 'User',
-        email: 'Error loading profile',
-        phone: 'N/A',
-        address: 'N/A'
-      });
+      // Set minimal profile data so UI can still render logout option
+      // setProfile({
+      //   name: 'User',
+      //   email: 'Error loading profile',
+      //   phone: 'N/A',
+      //   address: 'N/A'
+      // });
+      // Keep profile null so error UI shows
     } finally {
       setLoading(false);
     }
@@ -61,13 +64,24 @@ export default function ProfileScreen() {
 
   const onLogout = async () => {
     try {
+      console.log('🚪 Logout initiated');
       await api.auth.logout();
+      console.log('✅ Tokens cleared. Resetting navigation...');
+
+      // Navigate to Login instead of Welcome to be safe, or Welcome if that's the root
       navigation.reset({
         index: 0,
-        routes: [{ name: 'Welcome' }],
+        routes: [{ name: 'Login' }],
       });
-    } catch (error) {
-      Alert.alert('Error', 'Failed to logout');
+    } catch (error: any) {
+      console.error('Logout Error:', error);
+      Alert.alert('Logout Error', 'Failed to logout: ' + (error.message || 'Unknown error'));
+
+      // Force navigation anyway if sensitive
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     }
   };
 
@@ -75,6 +89,12 @@ export default function ProfileScreen() {
   if (!profile) return (
     <View className="h-full flex items-center justify-center bg-white space-y-4">
       <Text className="text-red-500 text-lg">Failed to load profile</Text>
+      <TouchableOpacity
+        onPress={loadProfile}
+        className="bg-[#027A4C] px-6 py-3 rounded-xl"
+      >
+        <Text className="text-white font-semibold">Retry</Text>
+      </TouchableOpacity>
       <TouchableOpacity
         onPress={onLogout}
         className="bg-red-500 px-6 py-3 rounded-xl"
@@ -91,9 +111,14 @@ export default function ProfileScreen() {
         colors={['#003E2F', '#005C3C', '#027A4C']}
         className="px-6 pt-12 pb-16 rounded-b-[32px]"
       >
-        <Text className="text-white mb-8 text-2xl font-semibold">
-          Profile
-        </Text>
+        <View className="flex-row items-center mb-8 gap-4">
+          <TouchableOpacity onPress={() => navigation.goBack()}>
+            <ArrowLeft size={24} color="white" strokeWidth={1.5} />
+          </TouchableOpacity>
+          <Text className="text-white text-2xl font-semibold">
+            Profile
+          </Text>
+        </View>
 
         <View className="items-center">
           <View className="w-24 h-24 rounded-full bg-white/20 items-center justify-center mb-4">
@@ -152,9 +177,7 @@ export default function ProfileScreen() {
                 <Text className="text-gray-900 text-sm font-medium">
                   {profile.address || 'N/A'}
                 </Text>
-                <Text className="text-gray-900 text-sm font-medium">
-                  UrbanEase
-                </Text>
+                {/* Removed hardcoded UrbanEase line */}
               </View>
             </View>
           </View>
