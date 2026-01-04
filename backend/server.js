@@ -58,8 +58,40 @@ app.use((err, req, res, next) => {
     });
 });
 
+// Initialize Socket.IO
+const http = require('http');
+const socketIo = require('socket.io');
+
+const server = http.createServer(app);
+const io = socketIo(server, {
+    cors: {
+        origin: "*", // Allow all origins for mobile/admin access
+        methods: ["GET", "POST"]
+    }
+});
+
+// Attach io to request for controllers
+app.use((req, res, next) => {
+    req.io = io;
+    next();
+});
+
+// Socket.IO Connection Handler
+io.on('connection', (socket) => {
+    console.log('New client connected:', socket.id);
+
+    socket.on('join_community', () => {
+        socket.join('community');
+        console.log(`Client ${socket.id} joined community`);
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Client disconnected:', socket.id);
+    });
+});
+
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

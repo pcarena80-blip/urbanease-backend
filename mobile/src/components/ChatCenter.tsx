@@ -2,13 +2,31 @@ import { useState } from 'react';
 import { View, Text, TouchableOpacity, Image } from 'react-native';
 import { ArrowLeft } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import CommunityChat from './CommunityChat';
 import PrivateChat from './PrivateChat';
+import { api } from '../services/api';
+import { useCallback } from 'react';
 
 export default function ChatCenter() {
   const navigation = useNavigation<any>();
   const [activeTab, setActiveTab] = useState<'community' | 'private'>('community');
+  const [unreadCounts, setUnreadCounts] = useState({ community: 0, totalPrivate: 0 });
+
+  useFocusEffect(
+    useCallback(() => {
+      loadUnreadCounts();
+    }, [])
+  );
+
+  const loadUnreadCounts = async () => {
+    try {
+      const counts = await api.chat.getUnreadCounts();
+      setUnreadCounts(counts);
+    } catch (error) {
+      console.log('Failed to load counts');
+    }
+  };
 
   return (
     <View className="h-full flex flex-col bg-gray-50">
@@ -48,6 +66,13 @@ export default function ChatCenter() {
             <Text className={`${activeTab === 'community' ? 'text-white' : 'text-gray-600'} text-[15px] font-medium relative top-0`}>
               Community Chat
             </Text>
+            {unreadCounts.community > 0 && (
+              <View className="ml-2 bg-red-500 rounded-full px-1.5 h-4 items-center justify-center">
+                <Text className="text-white text-[10px] font-bold">
+                  {unreadCounts.community > 99 ? '99+' : unreadCounts.community}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -65,6 +90,13 @@ export default function ChatCenter() {
             <Text className={`${activeTab === 'private' ? 'text-white' : 'text-gray-600'} text-[15px] font-medium`}>
               Private Chat
             </Text>
+            {unreadCounts.totalPrivate > 0 && (
+              <View className="ml-2 bg-red-500 rounded-full px-1.5 h-4 items-center justify-center">
+                <Text className="text-white text-[10px] font-bold">
+                  {unreadCounts.totalPrivate > 99 ? '99+' : unreadCounts.totalPrivate}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -95,6 +127,11 @@ export default function ChatCenter() {
                   <Text className="text-gray-900 mb-1 text-base font-semibold">UrbanEase Community</Text>
                   <Text className="text-gray-500 text-xs">256 members • Tap to open chat</Text>
                 </View>
+                {unreadCounts.community > 0 && (
+                  <View className="bg-red-500 rounded-full px-2 py-0.5">
+                    <Text className="text-white text-xs font-bold">{unreadCounts.community}</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             </View>
           </View>

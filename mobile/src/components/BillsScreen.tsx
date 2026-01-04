@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Modal, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, ActivityIndicator, Alert, TextInput, Modal, RefreshControl, KeyboardAvoidingView, Platform } from 'react-native';
 import { ArrowLeft, CheckCircle, Smartphone, Zap, Flame, Wrench, FileText, Download, Clock } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -202,117 +202,121 @@ export default function BillsScreen() {
         )}
       </ScrollView>
 
-      {/* Payment Modal */}
       <Modal
         animationType="slide"
         transparent={true}
         visible={!!selectedBill}
         onRequestClose={closeModal}
       >
-        <View className="flex-1 justify-end bg-black/60">
-          <View className="bg-white rounded-t-[32px] h-[85%] p-6">
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={{ flex: 1 }}
+        >
+          <View className="flex-1 justify-end bg-black/60">
+            <View className="bg-white rounded-t-[32px] h-[85%] p-6">
 
-            <View className="items-center mb-2">
-              <View className="w-16 h-1 bg-gray-300 rounded-full mb-6" />
-            </View>
-
-            {paymentSuccess ? (
-              // SUCCESS View
-              <View className="flex-1 items-center justify-center px-4">
-                <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-6">
-                  <CheckCircle size={40} color="#027A4C" />
-                </View>
-                <Text className="text-2xl font-bold text-[#027A4C] mb-2">Payment Successful!</Text>
-                <Text className="text-gray-500 text-center mb-8">
-                  Ref ID: {selectedBill?.referenceId}{'\n'}
-                  Transaction ID: {transactionId}
-                </Text>
-                <TouchableOpacity onPress={closeModal} className="bg-[#027A4C] w-full py-4 rounded-xl items-center">
-                  <Text className="text-white font-bold text-lg">Done</Text>
-                </TouchableOpacity>
+              <View className="items-center mb-2">
+                <View className="w-16 h-1 bg-gray-300 rounded-full mb-6" />
               </View>
-            ) : selectedBill && (
-              <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
 
-                <Text className="text-2xl font-bold text-gray-900 mb-1 capitalize text-center">{selectedBill.type} Bill</Text>
-                <Text className="text-gray-500 text-center mb-6">{selectedBill.billingMonth}</Text>
-
-                {/* Download Bill Option */}
-                <TouchableOpacity className="flex-row items-center justify-center gap-2 bg-blue-50 py-3 rounded-xl border border-blue-100 mb-8">
-                  <Download size={20} color="#2563EB" />
-                  <Text className="text-blue-700 font-semibold">Download Bill PDF</Text>
-                </TouchableOpacity>
-
-                {/* Details */}
-                <View className="bg-gray-50 p-5 rounded-2xl mb-6 space-y-4">
-                  <View className="flex-row justify-between">
-                    <Text className="text-gray-500">Consumer Name</Text>
-                    <Text className="font-semibold text-gray-900">{selectedBill.consumerName}</Text>
+              {paymentSuccess ? (
+                // SUCCESS View
+                <View className="flex-1 items-center justify-center px-4">
+                  <View className="w-20 h-20 bg-green-100 rounded-full items-center justify-center mb-6">
+                    <CheckCircle size={40} color="#027A4C" />
                   </View>
-                  <View className="flex-row justify-between">
-                    <Text className="text-gray-500">Bill ID</Text>
-                    <Text className="font-semibold text-gray-900">{selectedBill.billId}</Text>
-                  </View>
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-gray-500">Reference ID</Text>
-                    <Text className="font-mono font-bold text-gray-800 bg-white px-2 py-1 rounded border border-gray-200">{selectedBill.referenceId}</Text>
-                  </View>
-                  <View className="h-[1px] bg-gray-200 my-2" />
-                  <View className="flex-row justify-between items-center">
-                    <Text className="text-gray-900 font-bold text-lg">Total Amount</Text>
-                    <Text className="text-[#027A4C] font-bold text-2xl">PKR {selectedBill.amount.toLocaleString()}</Text>
-                  </View>
-                </View>
-
-                {/* Payment Form */}
-                <Text className="font-bold text-gray-900 mb-3 text-lg">Payment Details</Text>
-
-                <Text className="text-gray-500 mb-2 font-medium text-sm">Select Method</Text>
-                <View className="flex-row gap-4 mb-6">
-                  <TouchableOpacity
-                    onPress={() => setPaymentMethod('JazzCash')}
-                    className={`flex-1 p-4 rounded-xl border-2 items-center ${paymentMethod === 'JazzCash' ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
-                  >
-                    <Text className={`font-bold ${paymentMethod === 'JazzCash' ? 'text-red-500' : 'text-gray-600'}`}>JazzCash</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setPaymentMethod('EasyPaisa')}
-                    className={`flex-1 p-4 rounded-xl border-2 items-center ${paymentMethod === 'EasyPaisa' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}
-                  >
-                    <Text className={`font-bold ${paymentMethod === 'EasyPaisa' ? 'text-green-500' : 'text-gray-600'}`}>EasyPaisa</Text>
+                  <Text className="text-2xl font-bold text-[#027A4C] mb-2">Payment Successful!</Text>
+                  <Text className="text-gray-500 text-center mb-8">
+                    Ref ID: {selectedBill?.referenceId}{'\n'}
+                    Transaction ID: {transactionId}
+                  </Text>
+                  <TouchableOpacity onPress={closeModal} className="bg-[#027A4C] w-full py-4 rounded-xl items-center">
+                    <Text className="text-white font-bold text-lg">Done</Text>
                   </TouchableOpacity>
                 </View>
+              ) : selectedBill && (
+                <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
 
-                <Text className="text-gray-500 mb-2 font-medium text-sm">Mobile Number</Text>
-                <View className="flex-row items-center border border-gray-300 rounded-xl px-4 py-3 bg-white mb-8 focus:border-[#027A4C]">
-                  <Smartphone size={20} color="#6B7280" />
-                  <TextInput
-                    className="flex-1 ml-3 text-lg text-gray-900"
-                    placeholder="03001234567"
-                    placeholderTextColor="#9CA3AF"
-                    keyboardType="numeric"
-                    maxLength={11}
-                    value={mobileNumber}
-                    onChangeText={setMobileNumber}
-                  />
-                </View>
+                  <Text className="text-2xl font-bold text-gray-900 mb-1 capitalize text-center">{selectedBill.type} Bill</Text>
+                  <Text className="text-gray-500 text-center mb-6">{selectedBill.billingMonth}</Text>
 
-                <TouchableOpacity
-                  onPress={handlePayment}
-                  disabled={paying}
-                  className={`w-full py-4 rounded-xl items-center shadow-lg ${paying ? 'bg-gray-400' : 'bg-[#027A4C]'}`}
-                >
-                  {paying ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-lg">Confirm Payment</Text>}
-                </TouchableOpacity>
+                  {/* Download Bill Option */}
+                  <TouchableOpacity className="flex-row items-center justify-center gap-2 bg-blue-50 py-3 rounded-xl border border-blue-100 mb-8">
+                    <Download size={20} color="#2563EB" />
+                    <Text className="text-blue-700 font-semibold">Download Bill PDF</Text>
+                  </TouchableOpacity>
 
-                <TouchableOpacity onPress={closeModal} className="py-4 items-center mb-4">
-                  <Text className="text-gray-500 font-medium">Cancel</Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
+                  {/* Details */}
+                  <View className="bg-gray-50 p-5 rounded-2xl mb-6 space-y-4">
+                    <View className="flex-row justify-between">
+                      <Text className="text-gray-500">Consumer Name</Text>
+                      <Text className="font-semibold text-gray-900">{selectedBill.consumerName}</Text>
+                    </View>
+                    <View className="flex-row justify-between">
+                      <Text className="text-gray-500">Bill ID</Text>
+                      <Text className="font-semibold text-gray-900">{selectedBill.billId}</Text>
+                    </View>
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-gray-500">Reference ID</Text>
+                      <Text className="font-mono font-bold text-gray-800 bg-white px-2 py-1 rounded border border-gray-200">{selectedBill.referenceId}</Text>
+                    </View>
+                    <View className="h-[1px] bg-gray-200 my-2" />
+                    <View className="flex-row justify-between items-center">
+                      <Text className="text-gray-900 font-bold text-lg">Total Amount</Text>
+                      <Text className="text-[#027A4C] font-bold text-2xl">PKR {selectedBill.amount.toLocaleString()}</Text>
+                    </View>
+                  </View>
+
+                  {/* Payment Form */}
+                  <Text className="font-bold text-gray-900 mb-3 text-lg">Payment Details</Text>
+
+                  <Text className="text-gray-500 mb-2 font-medium text-sm">Select Method</Text>
+                  <View className="flex-row gap-4 mb-6">
+                    <TouchableOpacity
+                      onPress={() => setPaymentMethod('JazzCash')}
+                      className={`flex-1 p-4 rounded-xl border-2 items-center ${paymentMethod === 'JazzCash' ? 'border-red-500 bg-red-50' : 'border-gray-200 bg-white'}`}
+                    >
+                      <Text className={`font-bold ${paymentMethod === 'JazzCash' ? 'text-red-500' : 'text-gray-600'}`}>JazzCash</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      onPress={() => setPaymentMethod('EasyPaisa')}
+                      className={`flex-1 p-4 rounded-xl border-2 items-center ${paymentMethod === 'EasyPaisa' ? 'border-green-500 bg-green-50' : 'border-gray-200 bg-white'}`}
+                    >
+                      <Text className={`font-bold ${paymentMethod === 'EasyPaisa' ? 'text-green-500' : 'text-gray-600'}`}>EasyPaisa</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <Text className="text-gray-500 mb-2 font-medium text-sm">Mobile Number</Text>
+                  <View className="flex-row items-center border border-gray-300 rounded-xl px-4 py-3 bg-white mb-8 focus:border-[#027A4C]">
+                    <Smartphone size={20} color="#6B7280" />
+                    <TextInput
+                      className="flex-1 ml-3 text-lg text-gray-900"
+                      placeholder="03001234567"
+                      placeholderTextColor="#9CA3AF"
+                      keyboardType="numeric"
+                      maxLength={11}
+                      value={mobileNumber}
+                      onChangeText={setMobileNumber}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handlePayment}
+                    disabled={paying}
+                    className={`w-full py-4 rounded-xl items-center shadow-lg ${paying ? 'bg-gray-400' : 'bg-[#027A4C]'}`}
+                  >
+                    {paying ? <ActivityIndicator color="white" /> : <Text className="text-white font-bold text-lg">Confirm Payment</Text>}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={closeModal} className="py-4 items-center mb-4">
+                    <Text className="text-gray-500 font-medium">Cancel</Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
     </View>

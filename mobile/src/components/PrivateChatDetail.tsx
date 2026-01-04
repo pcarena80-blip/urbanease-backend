@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Paperclip } from 'lucide-react-native';
@@ -15,14 +15,24 @@ export default function PrivateChatDetail() {
     const [messages, setMessages] = useState<any[]>([]);
     const [user, setUser] = useState<any>(null);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
+    const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
         loadUser();
         // Initial load
         loadMessages();
+        loadUnreadCount();
+
         // Poll for new messages every 3s
-        const interval = setInterval(loadMessages, 3000);
-        return () => clearInterval(interval);
+        const interval = setInterval(loadMessages, 5000);
+
+        // Mark as read on mount and unmount
+        markAsRead();
+        return () => {
+            clearInterval(interval);
+            markAsRead();
+        };
     }, []);
 
     const loadUser = async () => {
@@ -32,16 +42,33 @@ export default function PrivateChatDetail() {
 
     const loadMessages = async () => {
         try {
-            // Fetch all messages (or filtered by chat.id if backend supports it)
-            // Assuming getMessages returns all messages involving this user
-            // We need to filter client-side if backend doesn't filter
-            // But api.chat.getMessages currently hits /chat/:userId (GET)
-            // It might return all chats or specific conversation?
-            // Let's assume it returns a list of messages.
             const data = await api.chat.getMessages(chat.id);
             setMessages(data);
         } catch (error) {
             console.log('Error loading private messages:', error);
+        }
+    };
+
+    const loadUnreadCount = async () => {
+        try {
+            // We can get the specific count for this chat by getting all counts
+            const counts = await api.chat.getUnreadCounts();
+            if (counts.privateChats && counts.privateChats[chat.id]) {
+                setUnreadCount(counts.privateChats[chat.id]);
+            } else {
+                setUnreadCount(0);
+            }
+        } catch (error) {
+            console.log('Failed to load unread count');
+        }
+    };
+
+    const markAsRead = async () => {
+        try {
+            await api.chat.markAsRead(chat.id);
+            setUnreadCount(0);
+        } catch (error) {
+            console.log('Failed to mark as read');
         }
     };
 
@@ -147,8 +174,25 @@ export default function PrivateChatDetail() {
                         </View>
                     </LinearGradient>
 
+                    {/* Unread Messages Banner */}
+                    {unreadCount > 0 && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                // Scroll logic would go here if we tracked specific message IDs
+                                // For now just mark as read
+                                markAsRead();
+                            }}
+                            className="bg-blue-500 py-2 px-4"
+                        >
+                            <Text className="text-white text-center font-medium">
+                                ↓ {unreadCount} unread message{unreadCount > 1 ? 's' : ''} from {chat.name}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
+
                     {/* Messages */}
                     <FlatList
+                        ref={flatListRef}
                         data={messages}
                         keyExtractor={(item) => item.id.toString()}
                         renderItem={renderItem}

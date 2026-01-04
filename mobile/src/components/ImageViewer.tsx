@@ -5,15 +5,16 @@ import { X } from 'lucide-react-native';
 const { width, height } = Dimensions.get('window');
 
 interface ImageViewerProps {
-    visible: boolean;
-    imageUrl: string;
+    image: string | null;
     onClose: () => void;
 }
 
-export default function ImageViewer({ visible, imageUrl, onClose }: ImageViewerProps) {
+export default function ImageViewer({ image, onClose }: ImageViewerProps) {
+    if (!image) return null;
+
     return (
         <Modal
-            visible={visible}
+            visible={!!image}
             transparent
             animationType="fade"
             onRequestClose={onClose}
@@ -31,9 +32,10 @@ export default function ImageViewer({ visible, imageUrl, onClose }: ImageViewerP
                     showsVerticalScrollIndicator={false}
                 >
                     <Image
-                        source={{ uri: imageUrl }}
+                        source={{ uri: image }}
                         style={styles.image}
                         resizeMode="contain"
+                        onError={(e) => console.log('Image load error:', e.nativeEvent.error)}
                     />
                 </ScrollView>
             </View>

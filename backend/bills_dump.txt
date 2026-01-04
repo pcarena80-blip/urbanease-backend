@@ -1,0 +1,5 @@
+[BILL] ID: 6958246ffc0b7a5f04b06af2 | User: 694671d2df555cebb2cb899a | Month: "January 2026" | Type: "maintenance" | Status: paid | Amount: 1500
+[BILL] ID: 6958246ffc0b7a5f04b06af5 | User: 6946745bdf555cebb2cb89aa | Month: "January 2026" | Type: "maintenance" | Status: due | Amount: 1500
+[BILL] ID: 6958246ffc0b7a5f04b06af8 | User: 6947107e2afdc28d0521dfa6 | Month: "January 2026" | Type: "maintenance" | Status: due | Amount: 1500
+[BILL] ID: 69582470fc0b7a5f04b06afb | User: 694803bd36736850ba925dbe | Month: "January 2026" | Type: "maintenance" | Status: due | Amount: 1500
+[BILL] ID: 69582470fc0b7a5f04b06afe | User: 694fde434091920c0bd49a99 | Month: "January 2026" | Type: "maintenance" | Status: due | Amount: 1500

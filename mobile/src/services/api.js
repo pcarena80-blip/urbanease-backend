@@ -6,13 +6,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
 // const BASE_URL = 'https://musicians-index-vector-reef.trycloudflare.com/api';
 // AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
-const BASE_URL = 'https://merely-feof-brighton-llc.trycloudflare.com/api';
+// const BASE_URL = 'https://outlet-coverage-burns-abstract.trycloudflare.com/api';
+// Local Network Dev (Localtunnel) - INACTIVE (service issues)
+// const BASE_URL = 'https://bright-news-shout.loca.lt/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Direct WiFi)
+// Local Network Dev (Direct WiFi) - ACTIVE
 // const BASE_URL = 'http://192.168.18.131:5000/api';
+// AWS Direct HTTP - ACTIVE
+const BASE_URL = 'http://51.20.34.254:5000/api';
 // Cloud Production (Any WiFi/4G)
 // const BASE_URL = 'https://urbanease-backend-suham.onrender.com/api';
 console.log('🌐 API BASE_URL:', BASE_URL);
@@ -57,10 +61,13 @@ const handleApiError = async (error, endpoint) => {
 // Global request helper to handle errors centralized
 const request = async (endpoint, options = {}, retries = 3) => {
     try {
+        const isFormData = options.body instanceof FormData;
+        const defaultHeaders = isFormData ? {} : { 'Content-Type': 'application/json' };
+
         const response = await fetch(`${BASE_URL}${endpoint}`, {
             ...options,
             headers: {
-                'Content-Type': 'application/json',
+                ...defaultHeaders,
                 ...options.headers,
             },
         });
@@ -127,36 +134,36 @@ export const api = {
             await AsyncStorage.removeItem('token');
             await AsyncStorage.removeItem('user');
         },
-        forgotPassword: async (email) => {
-            try {
-                const response = await fetch(`${BASE_URL}/auth/forgot-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email }),
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to send OTP');
-                return data;
-            } catch (error) {
-                throw error;
-            }
+        sendOtp: async (email) => { // Send Registration OTP
+            return request('/auth/send-otp', {
+                method: 'POST',
+                body: JSON.stringify({ email }),
+            });
         },
-        resetPassword: async (email, otp, newPassword) => {
-            try {
-                const response = await fetch(`${BASE_URL}/auth/reset-password`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, otp, newPassword }),
-                });
-
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.message || 'Failed to reset password');
-                return data;
-            } catch (error) {
-                throw error;
-            }
-        }
+        verifyOtp: async (email, otp) => { // Verify Registration OTP
+            return request('/auth/verify-otp', {
+                method: 'POST',
+                body: JSON.stringify({ email, otp }),
+            });
+        },
+        forgotPassword: async (email) => { // Send Reset OTP
+            return request('/auth/forgot-password', {
+                method: 'POST',
+                body: JSON.stringify({ email }),
+            });
+        },
+        verifyResetOtp: async (email, otp) => { // Verify Reset OTP (before setting pwd)
+            return request('/auth/verify-reset-otp', {
+                method: 'POST',
+                body: JSON.stringify({ email, otp }),
+            });
+        },
+        resetPassword: async (email, otp, newPassword) => { // Set new password
+            return request('/auth/reset-password', {
+                method: 'POST',
+                body: JSON.stringify({ email, otp, newPassword }),
+            });
+        },
     },
     bills: {
         getAll: async () => {
@@ -229,6 +236,15 @@ export const api = {
         deleteMessage: async (messageId) => {
             return request(`/chat/${messageId}`, {
                 method: 'DELETE',
+                headers: await getHeaders()
+            });
+        },
+        getUnreadCounts: async () => {
+            return request('/chat/unread', { headers: await getHeaders() });
+        },
+        markAsRead: async (chatId) => {
+            return request(`/chat/read/${chatId}`, {
+                method: 'POST',
                 headers: await getHeaders()
             });
         }

@@ -21,6 +21,7 @@ export default function CommunityChat() {
     const [searchQuery, setSearchQuery] = useState('');
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
+    const [unreadCount, setUnreadCount] = useState(0);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -28,6 +29,7 @@ export default function CommunityChat() {
         loadLastReadId();
         loadCachedMessages();
         loadMessages();
+        loadUnreadCount();
         const interval = setInterval(loadMessages, 5000);
         return () => {
             clearInterval(interval);
@@ -92,6 +94,11 @@ export default function CommunityChat() {
 
     const markAsRead = async () => {
         try {
+            // Call backend API to mark community chat as read
+            await api.chat.markAsRead('community');
+            setUnreadCount(0);
+
+            // Also update local storage for scroll position
             if (messages.length > 0) {
                 const lastMsg = messages[messages.length - 1];
                 if (lastMsg.id) {
@@ -100,7 +107,16 @@ export default function CommunityChat() {
                 }
             }
         } catch (error) {
-            console.log('Failed to mark as read');
+            console.log('Failed to mark as read:', error);
+        }
+    };
+
+    const loadUnreadCount = async () => {
+        try {
+            const counts = await api.chat.getUnreadCounts();
+            setUnreadCount(counts.community || 0);
+        } catch (error) {
+            console.log('Failed to load unread count');
         }
     };
 
@@ -324,6 +340,30 @@ export default function CommunityChat() {
                             )}
                         </View>
                     </LinearGradient>
+
+                    {/* Unread Messages Banner */}
+                    {unreadCount > 0 && (
+                        <TouchableOpacity
+                            onPress={() => {
+                                // Scroll to first unread and mark as read
+                                if (lastReadMessageId && flatListRef.current) {
+                                    const unreadIndex = messages.findIndex(m => m.id?.toString() === lastReadMessageId);
+                                    if (unreadIndex > -1 && unreadIndex < messages.length - 1) {
+                                        flatListRef.current.scrollToIndex({
+                                            index: unreadIndex + 1,
+                                            animated: true,
+                                            viewPosition: 0
+                                        });
+                                    }
+                                }
+                            }}
+                            className="bg-blue-500 py-2 px-4"
+                        >
+                            <Text className="text-white text-center font-medium">
+                                ↓ {unreadCount} unread message{unreadCount > 1 ? 's' : ''}
+                            </Text>
+                        </TouchableOpacity>
+                    )}
 
                     {/* Messages */}
                     <FlatList

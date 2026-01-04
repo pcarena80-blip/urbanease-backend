@@ -7,7 +7,7 @@ dotenv.config();
 
 // Define Admin Credentials
 const ADMIN_EMAIL = 'admin@urbanease.com';
-const ADMIN_PASS = 'password123';
+const ADMIN_PASS = 'pakistan123';
 
 const resetAdmin = async () => {
     try {

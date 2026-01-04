@@ -37,8 +37,14 @@ export default function HomeScreen() {
   const loadNotices = async () => {
     try {
       const data = await api.notices.getAll();
-      // Take top 2 recent notices
-      setActiveNotices(data.slice(0, 2));
+      // Filter out notices with invalid dates
+      const validNotices = data.filter((n: any) => {
+        if (!n.createdAt) return false;
+        const date = new Date(n.createdAt);
+        return !isNaN(date.getTime());
+      });
+      // Take top 2 recent valid notices
+      setActiveNotices(validNotices.slice(0, 2));
     } catch (e) {
       console.log('Failed to load notices', e);
     }
@@ -53,9 +59,19 @@ export default function HomeScreen() {
   ];
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    // Calc time ago if needed, or just date
-    return date.toLocaleDateString();
+    if (!dateString) return 'No Date';
+    try {
+      const date = new Date(dateString);
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.log('Invalid date string:', dateString);
+        // Fallback: Return raw string or parsed part
+        return dateString.split('T')[0] || dateString;
+      }
+      return date.toLocaleDateString();
+    } catch (e) {
+      return dateString;
+    }
   };
 
   return (

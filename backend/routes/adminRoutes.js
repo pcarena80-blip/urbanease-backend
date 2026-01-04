@@ -132,206 +132,271 @@ router.put('/bills/:id/status', protect, adminMiddleware, async (req, res) => {
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
-});
-
-// Dispatch Monthly Bills (Generate bills for all residents)
-router.post('/bills/dispatch', protect, adminMiddleware, async (req, res) => {
-    try {
-        const { month, type, amount, dueDate } = req.body; // e.g., 'January 2025', 'Maintenance', 5000, '2025-01-15'
-
-        if (!month || !type || !amount || !dueDate) {
-            return res.status(400).json({ message: 'Please provide month, type, amount, and due date' });
+    // Delete bill
+    router.delete('/bills/:id', protect, adminMiddleware, async (req, res) => {
+        try {
+            const bill = await Bill.findById(req.params.id);
+            if (bill) {
+                await bill.deleteOne();
+                res.json({ message: 'Bill removed' });
+            } else {
+                res.status(404).json({ message: 'Bill not found' });
+            }
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
         }
+    });
 
-        const residents = await User.find({ role: 'user', isVerified: true });
-        const billsCreated = [];
+    // Dispatch Monthly Bills (Generate bills for all residents)
+    router.post('/bills/dispatch', protect, adminMiddleware, async (req, res) => {
+        try {
+            const { month, types, dueDate } = req.body; // types is an array like ['electricity', 'gas', 'maintenance']
 
-        for (const resident of residents) {
-            // Check if bill already exists for this user, month, and type
-            const existingBill = await Bill.findOne({
-                userId: resident._id,
-                month,
-                type
+            if (!month || !types || !Array.isArray(types) || types.length === 0 || !dueDate) {
+                return res.status(400).json({ message: 'Please provide month, types (array), and dueDate' });
+            }
+
+            const residents = await User.find({ role: 'user' });
+            console.log(`[DISPATCH] Found ${residents.length} residents with role 'user'.`);
+
+            if (residents.length === 0) {
+                console.log('[DISPATCH] No residents found. Aborting.');
+                return res.status(400).json({ message: 'No registered residents found' });
+            }
+
+            let createdCount = 0;
+            let skippedCount = 0;
+
+            for (const resident of residents) {
+                for (const type of types) {
+                    // Normalize type to lowercase for consistent handling
+                    const normalizedType = type.toLowerCase();
+
+                    // Generate unique IDs
+                    const timestamp = Date.now();
+                    const randomNum = Math.floor(Math.random() * 10000);
+                    const uniqueBillId = `${normalizedType.toUpperCase().substring(0, 2)}-${timestamp}-${randomNum}`;
+                    const uniqueRefId = `REF-${timestamp}-${randomNum}`;
+
+                    // Check if bill already exists for this user, month, and type
+                    const existingBill = await Bill.findOne({
+                        userId: resident._id,
+                        billingMonth: month,
+                        type: normalizedType
+                    });
+
+                    if (existingBill) {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    // Generate amount based on type
+                    let amount;
+                    let provider;
+                    switch (normalizedType) {
+                        case 'electricity':
+                            amount = Math.floor(Math.random() * 3000) + 2000;
+                            provider = 'IESCO';
+                            break;
+                        case 'gas':
+                            amount = Math.floor(Math.random() * 1500) + 500;
+                            provider = 'SNGPL';
+                            break;
+                        case 'maintenance':
+                            amount = 1500;
+                            provider = 'Urban Ease Residency';
+                            break;
+                        default:
+                            amount = 1000;
+                            provider = 'Urban Ease';
+                    }
+
+                    await Bill.create({
+                        userId: resident._id,
+                        consumerId: resident._id.toString(),
+                        type: normalizedType,
+                        provider,
+                        billId: uniqueBillId,
+                        referenceId: uniqueRefId,
+                        amount,
+                        dueDate,
+                        billingMonth: month,
+                        status: 'due',
+                        consumerName: resident.name,
+                        address: resident.block ? `${resident.block}, ${resident.street}, ${resident.houseNo}` : `${resident.plazaName || ''}, Floor ${resident.floorNumber || ''}, Flat ${resident.flatNumber || ''}`
+                    });
+                    createdCount++;
+                }
+            }
+
+            res.json({
+                message: `Generated ${createdCount} bills (${skippedCount} skipped as duplicates)`,
+                created: createdCount,
+                skipped: skippedCount
+            });
+        } catch (error) {
+            console.error('Dispatch Error:', error);
+            res.status(500).json({ message: 'Server error: ' + error.message });
+        }
+    });
+
+    // Get Dashboard Stats
+    router.get('/stats', protect, adminMiddleware, async (req, res) => {
+        try {
+            // Users Stats
+            const totalResidents = await User.countDocuments({ role: 'user' });
+            const activeResidents = await User.countDocuments({ role: 'user', isVerified: true });
+
+            // Complaint Stats
+            const activeComplaints = await Complaint.countDocuments({ status: 'in-progress' });
+            const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
+
+            // Bill Stats
+            const billsDue = await Bill.aggregate([
+                { $match: { status: 'unpaid' } },
+                { $group: { _id: null, total: { $sum: "$amount" } } }
+            ]);
+            const totalBillsDue = billsDue.length > 0 ? billsDue[0].total : 0;
+            const unpaidBillsCount = await Bill.countDocuments({ status: 'unpaid' });
+
+            // Notice Stats
+            const activeNotices = await Notice.countDocuments({ expiryDate: { $gte: new Date() } });
+
+            // Complaint Resolution Data (Dummy logic for graph for now, or aggregate by createdAt)
+            // For simplicity, we'll return static graph data but real counts
+            // To do real graph: would need aggregation of changes or creation dates. 
+            // Let's rely on frontend for graph (or keep static graph until complex aggregation is needed).
+            // For now, let's send what we have.
+
+            res.json({
+                totalResidents,
+                activeResidents,
+                activeComplaints,
+                pendingComplaints,
+                totalBillsDue,
+                unpaidBillsCount,
+                activeNotices
             });
 
-            if (!existingBill) {
-                const newBill = await Bill.create({
-                    userId: resident._id,
-                    type,
-                    amount,
-                    dueDate,
-                    month,
-                    refNo: `${type.substring(0, 3).toUpperCase()}-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                    status: 'due'
-                });
-                billsCreated.push(newBill);
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ message: 'Server error fetching stats' });
+        }
+    });
+
+    // NOTICE ROUTES
+
+    // Get all notices
+    router.get('/notices', protect, adminMiddleware, async (req, res) => {
+        try {
+            const notices = await Notice.find().sort({ createdAt: -1 });
+            res.json(notices);
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
+        }
+    });
+
+    // Create notice
+    router.post('/notices', protect, adminMiddleware, async (req, res) => {
+        try {
+            const { title, description, expiryDate } = req.body;
+            const notice = await Notice.create({
+                title,
+                description,
+                expiryDate
+            });
+
+            // Notify users via Socket.IO
+            if (req.io) {
+                req.io.to('community').emit('new_announcement', notice);
             }
+
+            res.status(201).json(notice);
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
         }
+    });
 
-        res.json({ message: `Generated ${billsCreated.length} bills`, bills: billsCreated });
-    } catch (error) {
-        console.error('Dispatch Error:', error);
-        res.status(500).json({ message: 'Server error generating bills' });
-    }
-});
-
-// Get Dashboard Stats
-router.get('/stats', protect, adminMiddleware, async (req, res) => {
-    try {
-        // Users Stats
-        const totalResidents = await User.countDocuments({ role: 'user' });
-        const activeResidents = await User.countDocuments({ role: 'user', isVerified: true });
-
-        // Complaint Stats
-        const activeComplaints = await Complaint.countDocuments({ status: 'in-progress' });
-        const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
-
-        // Bill Stats
-        const billsDue = await Bill.aggregate([
-            { $match: { status: 'unpaid' } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const totalBillsDue = billsDue.length > 0 ? billsDue[0].total : 0;
-        const unpaidBillsCount = await Bill.countDocuments({ status: 'unpaid' });
-
-        // Notice Stats
-        const activeNotices = await Notice.countDocuments({ expiryDate: { $gte: new Date() } });
-
-        // Complaint Resolution Data (Dummy logic for graph for now, or aggregate by createdAt)
-        // For simplicity, we'll return static graph data but real counts
-        // To do real graph: would need aggregation of changes or creation dates. 
-        // Let's rely on frontend for graph (or keep static graph until complex aggregation is needed).
-        // For now, let's send what we have.
-
-        res.json({
-            totalResidents,
-            activeResidents,
-            activeComplaints,
-            pendingComplaints,
-            totalBillsDue,
-            unpaidBillsCount,
-            activeNotices
-        });
-
-    } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error fetching stats' });
-    }
-});
-
-// NOTICE ROUTES
-
-// Get all notices
-router.get('/notices', protect, adminMiddleware, async (req, res) => {
-    try {
-        const notices = await Notice.find().sort({ createdAt: -1 });
-        res.json(notices);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-// Create notice
-router.post('/notices', protect, adminMiddleware, async (req, res) => {
-    try {
-        const { title, description, expiryDate } = req.body;
-        const notice = await Notice.create({
-            title,
-            description,
-            expiryDate
-        });
-
-        // Notify users via Socket.IO
-        if (req.io) {
-            req.io.to('community').emit('new_announcement', notice);
+    // Delete notice
+    router.delete('/notices/:id', protect, adminMiddleware, async (req, res) => {
+        try {
+            const notice = await Notice.findById(req.params.id);
+            if (notice) {
+                await notice.deleteOne();
+                res.json({ message: 'Notice removed' });
+            } else {
+                res.status(404).json({ message: 'Notice not found' });
+            }
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
         }
+    });
 
-        res.status(201).json(notice);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+    // SUPER ADMIN ROUTES: Admin Management
 
-// Delete notice
-router.delete('/notices/:id', protect, adminMiddleware, async (req, res) => {
-    try {
-        const notice = await Notice.findById(req.params.id);
-        if (notice) {
-            await notice.deleteOne();
-            res.json({ message: 'Notice removed' });
-        } else {
-            res.status(404).json({ message: 'Notice not found' });
+    const superAdminMiddleware = require('../middleware/superAdminMiddleware');
+
+    // Get all admins
+    router.get('/admins', protect, superAdminMiddleware, async (req, res) => {
+        try {
+            const admins = await User.find({ role: 'admin' }).select('-password');
+            res.json(admins);
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
         }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+    });
 
-// SUPER ADMIN ROUTES: Admin Management
+    // Create new admin
+    router.post('/admins', protect, superAdminMiddleware, async (req, res) => {
+        try {
+            const { name, email, phone, password } = req.body;
 
-const superAdminMiddleware = require('../middleware/superAdminMiddleware');
+            if (!name || !email || !password) {
+                return res.status(400).json({ message: 'Please provide name, email, and password' });
+            }
 
-// Get all admins
-router.get('/admins', protect, superAdminMiddleware, async (req, res) => {
-    try {
-        const admins = await User.find({ role: 'admin' }).select('-password');
-        res.json(admins);
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+            const userExists = await User.findOne({ email });
+            if (userExists) {
+                return res.status(400).json({ message: 'User already exists' });
+            }
 
-// Create new admin
-router.post('/admins', protect, superAdminMiddleware, async (req, res) => {
-    try {
-        const { name, email, phone, password } = req.body;
+            // Hash password
+            const salt = await require('bcryptjs').genSalt(10);
+            const hashedPassword = await require('bcryptjs').hash(password, salt);
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: 'Please provide name, email, and password' });
+            const admin = await User.create({
+                name,
+                email,
+                phone: phone || '',
+                password: hashedPassword,
+                role: 'admin',
+                isVerified: true
+            });
+
+            res.status(201).json({
+                _id: admin.id,
+                name: admin.name,
+                email: admin.email,
+                role: admin.role
+            });
+        } catch (error) {
+            res.status(500).json({ message: 'Server error', error: error.message });
         }
+    });
 
-        const userExists = await User.findOne({ email });
-        if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+    // Delete admin
+    router.delete('/admins/:id', protect, superAdminMiddleware, async (req, res) => {
+        try {
+            const admin = await User.findById(req.params.id);
+            if (admin && admin.role === 'admin') {
+                await admin.deleteOne();
+                res.json({ message: 'Admin removed' });
+            } else {
+                res.status(404).json({ message: 'Admin not found or not an admin' });
+            }
+        } catch (error) {
+            res.status(500).json({ message: 'Server error' });
         }
+    });
 
-        // Hash password
-        const salt = await require('bcryptjs').genSalt(10);
-        const hashedPassword = await require('bcryptjs').hash(password, salt);
-
-        const admin = await User.create({
-            name,
-            email,
-            phone: phone || '',
-            password: hashedPassword,
-            role: 'admin',
-            isVerified: true
-        });
-
-        res.status(201).json({
-            _id: admin.id,
-            name: admin.name,
-            email: admin.email,
-            role: admin.role
-        });
-    } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
-    }
-});
-
-// Delete admin
-router.delete('/admins/:id', protect, superAdminMiddleware, async (req, res) => {
-    try {
-        const admin = await User.findById(req.params.id);
-        if (admin && admin.role === 'admin') {
-            await admin.deleteOne();
-            res.json({ message: 'Admin removed' });
-        } else {
-            res.status(404).json({ message: 'Admin not found or not an admin' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
-
-module.exports = router;
+    module.exports = router;

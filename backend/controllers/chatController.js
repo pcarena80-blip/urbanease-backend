@@ -1,5 +1,29 @@
 const ChatMessage = require('../models/ChatMessage');
 const User = require('../models/User');
+const ReadReceipt = require('../models/ReadReceipt');
+
+// Helper: Get unread count for a specific chat
+const getUnreadCountForChat = async (userId, chatId) => {
+    const receipt = await ReadReceipt.findOne({ userId, chatId });
+
+    let query;
+    if (chatId === 'community') {
+        query = { receiverId: 'community' };
+    } else {
+        // Private chat: messages sent TO this user FROM chatId
+        query = { senderId: chatId, receiverId: userId.toString() };
+    }
+
+    if (receipt && receipt.lastReadMessageId) {
+        // Count messages after lastReadMessageId
+        const lastReadMsg = await ChatMessage.findById(receipt.lastReadMessageId);
+        if (lastReadMsg) {
+            query.timestamp = { $gt: lastReadMsg.timestamp };
+        }
+    }
+
+    return await ChatMessage.countDocuments(query);
+};
 
 // @desc    Get chat messages
 // @route   GET /api/chat/:userId
@@ -170,6 +194,10 @@ const getInbox = async (req, res) => {
             const user = await User.findById(id).select('name email');
             if (user) {
                 const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '??';
+
+                // Calculate unread count for this contact
+                const unreadCount = await getUnreadCountForChat(myId, id);
+
                 contacts.push({
                     id: user._id,
                     name: user.name,
@@ -177,7 +205,8 @@ const getInbox = async (req, res) => {
                     lastMessage: data.lastMessage,
                     time: new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                     timestamp: data.timestamp, // for sorting if needed
-                    online: false // Placeholder for online status
+                    online: false, // Placeholder for online status
+                    unreadCount // Add unread count for badge
                 });
             }
         }
@@ -222,9 +251,86 @@ const deleteMessage = async (req, res) => {
     }
 };
 
+// @desc    Get all unread message counts
+// @route   GET /api/chat/unread
+// @access  Private
+const getUnreadCounts = async (req, res) => {
+    try {
+        const myId = req.user.id;
+
+        // Get community chat unread count
+        const communityUnread = await getUnreadCountForChat(myId, 'community');
+
+        // Get private chat unread counts
+        const messages = await ChatMessage.find({
+            receiverId: myId,
+            senderId: { $ne: myId }
+        }).distinct('senderId');
+
+        const privateChats = {};
+        for (const senderId of messages) {
+            const unread = await getUnreadCountForChat(myId, senderId.toString());
+            if (unread > 0) {
+                privateChats[senderId.toString()] = unread;
+            }
+        }
+
+        // Calculate total private unread
+        const totalPrivateUnread = Object.values(privateChats).reduce((sum, count) => sum + count, 0);
+
+        res.json({
+            community: communityUnread,
+            privateChats,
+            totalPrivate: totalPrivateUnread,
+            total: communityUnread + totalPrivateUnread
+        });
+    } catch (error) {
+        console.error('Get Unread Counts Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Mark chat as read
+// @route   POST /api/chat/read/:chatId
+// @access  Private
+const markAsRead = async (req, res) => {
+    try {
+        const myId = req.user.id;
+        const { chatId } = req.params;
+
+        // Get the latest message in this chat
+        let query;
+        if (chatId === 'community') {
+            query = { receiverId: 'community' };
+        } else {
+            query = { senderId: chatId, receiverId: myId };
+        }
+
+        const latestMessage = await ChatMessage.findOne(query).sort({ timestamp: -1 });
+
+        if (latestMessage) {
+            await ReadReceipt.findOneAndUpdate(
+                { userId: myId, chatId },
+                {
+                    lastReadMessageId: latestMessage._id,
+                    lastReadAt: new Date()
+                },
+                { upsert: true, new: true }
+            );
+        }
+
+        res.json({ success: true, chatId, markedAt: new Date() });
+    } catch (error) {
+        console.error('Mark As Read Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getMessages,
     sendMessage,
     getInbox,
-    deleteMessage
+    deleteMessage,
+    getUnreadCounts,
+    markAsRead
 };

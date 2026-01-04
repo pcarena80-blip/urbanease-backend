@@ -12,8 +12,8 @@ exports.dispatchBills = async (req, res) => {
     }
 
     try {
-        // Get all verified residents
-        const residents = await User.find({ isVerified: true, role: { $ne: 'admin' } });
+        // Get all verified residents (exclude admin and superadmin)
+        const residents = await User.find({ isVerified: true, role: 'user' });
 
         if (residents.length === 0) {
             return res.status(400).json({ message: 'No verified residents found' });
@@ -24,11 +24,18 @@ exports.dispatchBills = async (req, res) => {
 
         for (const resident of residents) {
             for (const type of types) {
+                // Generate unique IDs
+                const timestamp = Date.now();
+                const randomNum = Math.floor(Math.random() * 10000);
+                const uniqueBillId = `${type.toUpperCase().substring(0, 2)}-${timestamp}-${randomNum}`;
+                const uniqueRefId = `REF-${timestamp}-${randomNum}`;
+                const consumerIdStr = resident._id.toString();
+
                 // Check if bill already exists for this resident, type, and month
                 const existingBill = await Bill.findOne({
-                    consumerId: resident._id,
+                    userId: resident._id,
                     type: type,
-                    month: month
+                    billingMonth: month
                 });
 
                 if (existingBill) {
@@ -38,29 +45,39 @@ exports.dispatchBills = async (req, res) => {
 
                 // Generate random amount based on type
                 let amount;
+                let provider;
                 switch (type) {
                     case 'electricity':
                         amount = Math.floor(Math.random() * 3000) + 2000; // 2000-5000
+                        provider = 'IESCO';
                         break;
                     case 'gas':
                         amount = Math.floor(Math.random() * 1500) + 500; // 500-2000
+                        provider = 'SNGPL';
                         break;
                     case 'maintenance':
                         amount = 1500; // Fixed maintenance fee
+                        provider = 'Urban Ease Residency';
                         break;
                     default:
                         amount = 1000;
+                        provider = 'Urban Ease';
                 }
 
-                // Create the bill
+                // Create the bill with all required fields
                 await Bill.create({
-                    consumerId: resident._id,
+                    userId: resident._id,
+                    consumerId: consumerIdStr,
                     type: type,
+                    provider: provider,
+                    billId: uniqueBillId,
+                    referenceId: uniqueRefId,
                     amount: amount,
-                    month: month,
-                    dueDate: new Date(dueDate),
-                    status: 'unpaid',
-                    refNo: `${type.toUpperCase().substring(0, 3)}-${Date.now()}-${Math.floor(Math.random() * 1000)}`
+                    dueDate: dueDate,
+                    billingMonth: month,
+                    status: 'due',
+                    consumerName: resident.name,
+                    address: resident.block ? `${resident.block}, ${resident.street}, ${resident.houseNo}` : `${resident.plazaName}, Floor ${resident.floorNumber}, Flat ${resident.flatNumber}`
                 });
 
                 createdBills++;
@@ -85,7 +102,8 @@ exports.dispatchBills = async (req, res) => {
 // @access  Private
 exports.getAllBills = async (req, res) => {
     try {
-        const bills = await Bill.find({}).sort({ dueDate: 1 });
+        // Filter bills for the logged-in user only
+        const bills = await Bill.find({ userId: req.user.id }).sort({ dueDate: -1 });
         res.status(200).json(bills);
     } catch (error) {
         res.status(500).json({ message: error.message });
@@ -113,16 +131,27 @@ exports.getBillById = async (req, res) => {
 // @route   POST /api/bills/pay
 // @access  Private
 exports.payBill = async (req, res) => {
-    const { billId, phoneNumber, provider } = req.body;
+    // Accept both field name formats for compatibility
+    const billId = req.body.billId || req.body.referenceId;
+    const phoneNumber = req.body.phoneNumber || req.body.mobileNumber;
+    const provider = req.body.provider || req.body.paymentMethod;
 
     // 1. Validate Phone Number
     const phoneRegex = /^03\d{9}$/;
-    if (!phoneRegex.test(phoneNumber)) {
+    if (!phoneNumber || !phoneRegex.test(phoneNumber)) {
         return res.status(400).json({ message: 'Invalid phone number. Must be 11 digits starting with 03.' });
     }
 
+    if (!billId) {
+        return res.status(400).json({ message: 'Bill ID or Reference ID is required.' });
+    }
+
     try {
-        const bill = await Bill.findById(billId);
+        // Try to find bill by _id first, then by referenceId
+        let bill = await Bill.findById(billId).catch(() => null);
+        if (!bill) {
+            bill = await Bill.findOne({ referenceId: billId });
+        }
         if (!bill) {
             return res.status(404).json({ message: 'Bill not found' });
         }
@@ -131,25 +160,32 @@ exports.payBill = async (req, res) => {
             return res.status(400).json({ message: 'This bill is already paid.' });
         }
 
-        // 2. Simulate Payment Gateway success
-        // In real world, we would call JazzCash API here using bill.refNo
+        const transactionId = 'TXN-' + Date.now();
 
-        // 3. Update Bill
-        bill.status = 'paid';
-        bill.paidDate = Date.now();
-        bill.method = provider || 'Online';
-        bill.payerPhone = phoneNumber;
-
-        await bill.save();
+        // Use findByIdAndUpdate to avoid full validation on save
+        const updatedBill = await Bill.findByIdAndUpdate(
+            bill._id,
+            {
+                $set: {
+                    status: 'paid',
+                    paidDate: new Date(),
+                    method: provider || 'Online',
+                    payerPhone: phoneNumber,
+                    transactionId: transactionId
+                }
+            },
+            { new: true, runValidators: false }
+        );
 
         res.status(200).json({
             message: 'Payment Successful',
-            refId: bill.refNo,
-            transactionId: 'TXN-' + Date.now(),
-            bill
+            refId: updatedBill.referenceId,
+            transactionId: transactionId,
+            bill: updatedBill
         });
 
     } catch (error) {
+        console.error('Payment error:', error);
         res.status(500).json({ message: 'Payment failed: ' + error.message });
     }
 };

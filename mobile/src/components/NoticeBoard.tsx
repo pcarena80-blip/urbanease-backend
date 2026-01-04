@@ -16,7 +16,14 @@ export default function NoticesScreen() {
       console.log('📋 NoticeBoard: Fetching notices...');
       const data = await api.notices.getAll();
       console.log('📋 NoticeBoard: Received', data?.length, 'notices');
-      setNotices(data || []);
+
+      const validNotices = (data || []).filter((n: any) => {
+        if (!n.createdAt) return false;
+        const date = new Date(n.createdAt);
+        return !isNaN(date.getTime());
+      });
+
+      setNotices(validNotices);
     } catch (error: any) {
       console.error('📋 NoticeBoard: Error:', error);
       Alert.alert(
@@ -53,8 +60,16 @@ export default function NoticesScreen() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    if (!dateString) return 'No Date';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return dateString.split('T')[0] || dateString;
+      }
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch (e) {
+      return dateString;
+    }
   };
 
   return (

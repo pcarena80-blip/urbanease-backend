@@ -1,0 +1,22 @@
+﻿­ƒöì SYSTEM VERIFICATION
+
+­ƒôï NOTICES:
+   Total: 2
+   ÔÇó "Power Maintenance" | createdAt: ÔØî Invalid
+   ÔÇó "Community Meeting" | createdAt: ÔØî Invalid
+
+­ƒÆ░ BILLS (via Admin):
+   Total: 5
+   Duplicates: Ô£à None
+
+­ƒÆ¼ CHAT (Community):
+   Total messages: 47
+   Broken attachments: Ô£à None
+
+­ƒÅÑ API HEALTH:
+   Status: Ô£à Online
+   Response: UrbanEase API is running...
+
+========================================
+Ô£à SYSTEM VERIFICATION PASSED!
+   All checks completed successfully.

@@ -33,12 +33,20 @@ export default function ForgotPasswordScreen() {
     }
   };
 
-  const handleVerifyCode = () => {
+  const handleVerifyCode = async () => {
     if (!otp || otp.length < 6) {
       Alert.alert('Error', 'Please enter valid 6-digit code');
       return;
     }
-    setStep('reset');
+    setLoading(true);
+    try {
+      await api.auth.verifyResetOtp(email, otp);
+      setStep('reset');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Invalid code');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleResetPassword = async () => {

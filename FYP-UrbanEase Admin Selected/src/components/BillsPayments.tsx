@@ -33,10 +33,14 @@ export function BillsPayments() {
     try {
       await api.post('/admin/bills/dispatch', dispatchData);
       alert('Bills generated successfully for all verified residents');
-      setShowDispatchModal(false);
-      fetchBills();
-    } catch (error) {
-      alert('Failed to dispatch bills');
+      setDispatchData({
+        types: [],
+        month: new Date().toLocaleString('default', { month: 'long', year: 'numeric' }),
+        dueDate: new Date(new Date().setDate(new Date().getDate() + 10)).toISOString().split('T')[0]
+      });
+    } catch (error: any) {
+      console.error(error);
+      alert(`Failed to dispatch bills: ${error.response?.data?.message || error.message}`);
     } finally {
       setProcessing(false);
     }
@@ -89,7 +93,7 @@ export function BillsPayments() {
                 <div>
                   <label className="block text-sm mb-2 text-gray-400">Select Bill Types</label>
                   <div className="flex gap-4">
-                    {['Electricity', 'Gas', 'Maintenance'].map(type => (
+                    {['Maintenance'].map(type => (
                       <label key={type} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"

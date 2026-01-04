@@ -91,9 +91,18 @@ export default function PrivateChat() {
                   {contact.lastMessage}
                 </Text>
               </View>
-              <Text className="text-gray-400 text-[11px]">
-                {contact.time}
-              </Text>
+              <View className="items-end">
+                <Text className="text-gray-400 text-[11px]">
+                  {contact.time}
+                </Text>
+                {contact.unreadCount > 0 && (
+                  <View className="bg-red-500 rounded-full min-w-[20px] h-5 items-center justify-center px-1.5 mt-1">
+                    <Text className="text-white text-[11px] font-bold">
+                      {contact.unreadCount > 99 ? '99+' : contact.unreadCount}
+                    </Text>
+                  </View>
+                )}
+              </View>
             </TouchableOpacity>
           ))
         )}

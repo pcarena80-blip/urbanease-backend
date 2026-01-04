@@ -15,6 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 export default function ProfileScreen() {
   const navigation = useNavigation<any>();
@@ -62,26 +63,24 @@ export default function ProfileScreen() {
     }
   };
 
+  const { logout } = useAuth(); // Get logout from context
+
   const onLogout = async () => {
     try {
       console.log('🚪 Logout initiated');
-      await api.auth.logout();
-      console.log('✅ Tokens cleared. Resetting navigation...');
-
-      // Navigate to Login instead of Welcome to be safe, or Welcome if that's the root
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      await logout(); // Use context logout to update state
+      console.log('✅ Tokens cleared. State updated.');
+      // No need to manually navigate - AppNavigator will handle it when user state becomes null
     } catch (error: any) {
       console.error('Logout Error:', error);
       Alert.alert('Logout Error', 'Failed to logout: ' + (error.message || 'Unknown error'));
 
-      // Force navigation anyway if sensitive
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Login' }],
-      });
+      // Fallback: Check if we can just clear storage manually if context fails
+      try {
+        await api.auth.logout();
+      } catch (e) {
+        console.error('Fallback logout failed:', e);
+      }
     }
   };
 
