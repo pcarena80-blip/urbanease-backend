@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ImageViewer from './ImageViewer';
 
 export default function PrivateChatDetail() {
     const navigation = useNavigation<any>();
@@ -231,6 +232,14 @@ export default function PrivateChatDetail() {
                     </View>
                 </View>
             </KeyboardAvoidingView>
+
+            {/* Image Viewer */}
+            {viewerImage && (
+                <ImageViewer
+                    image={viewerImage}
+                    onClose={() => setViewerImage(null)}
+                />
+            )}
         </SafeAreaView>
     );
 }
