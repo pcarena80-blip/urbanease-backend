@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { ArrowLeft, Send, Paperclip, Download, Search, X } from 'lucide-react';
-import { api } from '../services/api';
+import { api, BASE_URL } from '../services/api';
 import { io } from 'socket.io-client';
 
 export default function CommunityChat({ onNavigate }: { onNavigate: (screen: string, data?: any) => void }) {
@@ -36,8 +36,8 @@ export default function CommunityChat({ onNavigate }: { onNavigate: (screen: str
         }
       }).catch(err => console.error("Failed to sync read status", err));
 
-      // Fetch total registered users count
-      fetch('http://localhost:5000/api/auth/users/count', {
+      // Fetch total registered users count using configured API
+      fetch(`${BASE_URL}/auth/users/count`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       })
         .then(res => res.json())
@@ -47,8 +47,10 @@ export default function CommunityChat({ onNavigate }: { onNavigate: (screen: str
 
     loadMessages();
 
-    // Socket.io Connection
-    socketRef.current = io('http://localhost:5000');
+    // Socket.io Connection - Use the same host as the API
+    const socketUrl = BASE_URL.replace('/api', ''); // Derive socket URL from API URL
+    console.log('Connecting socket to:', socketUrl);
+    socketRef.current = io(socketUrl);
     socketRef.current.emit('join_community');
 
     socketRef.current.on('new_message', (msg: any) => {
@@ -203,7 +205,8 @@ export default function CommunityChat({ onNavigate }: { onNavigate: (screen: str
     if (!path) return '';
     // Normalize path: replace backslashes, strip 'uploads/' prefix if present
     const cleanPath = path.replace(/\\/g, '/').replace(/^uploads\//, '');
-    return `http://localhost:5000/uploads/${cleanPath}`;
+    const rootUrl = BASE_URL.replace('/api', '');
+    return `${rootUrl}/uploads/${cleanPath}`;
   };
 
   const handleImageLoad = (imageUrl: string) => {

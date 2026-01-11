@@ -41,6 +41,7 @@ app.use('/api/notices', require('./routes/noticeRoutes'));
 app.use('/api/bills', require('./routes/billRoutes'));
 app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
+app.use('/api/carpool', require('./routes/carpoolRoutes'));
 
 // Default Route
 app.get('/', (req, res) => {
@@ -57,6 +58,8 @@ app.use((err, req, res, next) => {
     });
 });
 
+// Server restart trigger
+// Server restart trigger
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {

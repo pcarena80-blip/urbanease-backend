@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight } from 'lucide-react-native';
+import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight, Car } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
@@ -51,7 +51,7 @@ export default function HomeScreen() {
   };
 
   const quickActions = [
-    { icon: Receipt, label: 'Bills', screen: 'Bills', bg: '#FFF4E6', color: '#FF9800' },
+    { icon: Car, label: 'Carpooling', screen: 'Carpool', bg: '#FFF4E6', color: '#FF9800' },
     { icon: ClipboardList, label: 'Complaints', screen: 'Complaints', bg: '#FFEBEE', color: '#F44336' },
     { icon: FileText, label: 'Notices', screen: 'Notices', bg: '#F1F8F4', color: '#027A4C' },
     { icon: MessageSquare, label: 'Chat', screen: 'Chat', bg: '#E3F2FD', color: '#2196F3' },
@@ -131,8 +131,8 @@ export default function HomeScreen() {
             {activeNotices.length === 0 ? (
               <Text className="text-gray-400 text-sm py-2 text-center">No recent notices</Text>
             ) : (
-              activeNotices.map((notice) => (
-                <View key={notice._id} className="p-3 bg-gray-50 rounded-xl mb-2">
+              activeNotices.map((notice, index) => (
+                <View key={notice._id || index} className="p-3 bg-gray-50 rounded-xl mb-2">
                   <Text className="text-gray-900 mb-1 text-sm font-medium">
                     {notice.title}
                   </Text>
@@ -163,6 +163,7 @@ export default function HomeScreen() {
           <View className="flex-row flex-wrap">
             {quickActions.map((action, index) => (
               <TouchableOpacity
+                key={action.title || index}
                 key={index}
                 onPress={() => navigation.navigate(action.screen)}
                 className="items-center gap-2 mb-4 w-[30%]"

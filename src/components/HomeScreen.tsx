@@ -1,9 +1,9 @@
 import React from 'react';
-import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight } from 'lucide-react';
+import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight, Car } from 'lucide-react';
 
 export default function HomeScreen({ onNavigate }: { onNavigate: (screen: string) => void }) {
   const quickActions = [
-    { icon: Receipt, label: 'Bills', screen: 'bills', bg: '#FFF4E6', color: '#FF9800' },
+    { icon: Car, label: 'Carpooling', screen: 'carpool', bg: '#FFF4E6', color: '#FF9800' },
     { icon: ClipboardList, label: 'Complaints', screen: 'complaints', bg: '#FFEBEE', color: '#F44336' },
     { icon: FileText, label: 'Notices', screen: 'notices', bg: '#F1F8F4', color: '#027A4C' },
     { icon: MessageSquare, label: 'Chat', screen: 'chat', bg: '#E3F2FD', color: '#2196F3' },

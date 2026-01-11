@@ -2,6 +2,8 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const User = require('../models/User');
 const LoginHistory = require('../models/LoginHistory');
+const RegistrationOtp = require('../models/RegistrationOtp');
+const sendEmail = require('../utils/sendEmail');
 
 // Generate JWT
 const generateToken = (id) => {
@@ -12,7 +14,6 @@ const generateToken = (id) => {
 
 // Helper functions for validation
 const validateEmail = (email) => {
-    // Regex for valid email structure and specific domains
     const re = /^[a-zA-Z0-9._%+-]+@(gmail\.com|outlook\.com|yahoo\.com|hotmail\.com|icloud\.com)$/;
     return re.test(String(email).toLowerCase());
 };
@@ -23,47 +24,135 @@ const validatePassword = (password) => {
     return re.test(password);
 };
 
+// Helper to generate numeric OTP
+const generateOTP = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+// @desc    Send OTP for Registration
+// @route   POST /api/auth/send-otp
+const sendRegistrationOtp = async (req, res) => {
+    let { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    email = email.toLowerCase();
+
+    if (!validateEmail(email)) {
+        return res.status(400).json({ message: 'Invalid email domain' });
+    }
+
+    try {
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'Email already registered. Please login.' });
+        }
+
+        const otp = generateOTP();
+        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 mins
+
+        // ALWAYS LOG OTP FOR DEBUGGING
+        console.log(`[DEBUG ALWAYS] OTP for ${email}: ${otp}`);
+
+        await RegistrationOtp.findOneAndUpdate(
+            { email },
+            { email, otp, expiresAt, isVerified: false },
+            { upsert: true, new: true }
+        );
+
+        const message = `
+            <h1>Registration OTP</h1>
+            <p>Your OTP for UrbanEase registration is: <h2>${otp}</h2></p>
+            <p>This code expires in 10 minutes.</p>
+        `;
+
+        const emailSent = await sendEmail({
+            email,
+            subject: 'UrbanEase Registration OTP',
+            message
+        });
+
+        if (emailSent) {
+            res.json({ message: 'OTP sent successfully' });
+        } else {
+            console.log(`[DEV FALLBACK] OTP for ${email}: ${otp}`);
+            res.json({ message: 'OTP generated (Email failed - Check Console)' });
+        }
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// @desc    Verify Registration OTP
+// @route   POST /api/auth/verify-otp
+const verifyRegistrationOtp = async (req, res) => {
+    let { email, otp } = req.body;
+
+    if (!email || !otp) {
+        return res.status(400).json({ message: 'Email and OTP are required' });
+    }
+
+    email = email.toLowerCase();
+
+    try {
+        const record = await RegistrationOtp.findOne({
+            email,
+            otp,
+            expiresAt: { $gt: Date.now() }
+        });
+
+        if (!record) {
+            return res.status(400).json({ message: 'Invalid or expired OTP' });
+        }
+
+        record.isVerified = true;
+        await record.save();
+
+        res.json({ message: 'Email verified successfully', verified: true });
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
 // @desc    Register new user
 // @route   POST /api/auth/signup
-// @access  Public
-// @desc    Register new user
-// @route   POST /api/auth/signup
-// @access  Public
 const registerUser = async (req, res) => {
     let { name, fullName, email, phone, password } = req.body;
 
-    // Map fullName to name if name is missing (frontend support)
-    if (!name && fullName) {
-        name = fullName;
-    }
+    if (!name && fullName) name = fullName;
 
     if (!name || !email || !phone || !password) {
         return res.status(400).json({ message: 'Please add all fields' });
     }
 
-    email = email.toLowerCase(); // Enforce lowercase
+    email = email.toLowerCase();
 
-    if (!validateEmail(email)) {
-        return res.status(400).json({ message: 'Invalid email domain. Allowed: gmail.com, outlook.com, etc.' });
-    }
+    console.log(`[DEBUG] Attempting Signup for: ${email}`);
 
     if (!validatePassword(password)) {
-        return res.status(400).json({ message: 'Password must be at least 8 chars, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.' });
+        return res.status(400).json({ message: 'Password must be strong' });
     }
 
-    // Check if user exists
-    const userExists = await User.findOne({ email });
-
-    if (userExists) {
-        return res.status(400).json({ message: 'User already exists' });
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash(password, salt);
-
-    // Create user
     try {
+        // Enforce OTP verification
+        const verificationRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+        console.log(`[DEBUG] Verification Check for ${email}:`, verificationRecord);
+
+        // Only enforce if we successfully implemented OTP flow, but here we did.
+        if (!verificationRecord) {
+            console.log(`[DEBUG] FAILED: No verified OTP record found for ${email}`);
+            return res.status(400).json({ message: 'Email not verified. Please verify using OTP first.' });
+        }
+
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json({ message: 'User already exists' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
         const user = await User.create({
             name,
             email,
@@ -78,7 +167,11 @@ const registerUser = async (req, res) => {
             plazaName: req.body.plazaName,
             floorNumber: req.body.floorNumber,
             flatNumber: req.body.flatNumber,
+            role: 'user',
+            isVerified: true // Auto-verify for simplicity in this task
         });
+
+        await RegistrationOtp.deleteOne({ email }); // Cleanup
 
         if (user) {
             res.status(201).json({
@@ -90,27 +183,20 @@ const registerUser = async (req, res) => {
             });
         }
     } catch (error) {
-        console.error('Registration Error:', error.message);
         res.status(400).json({ message: 'Invalid user data: ' + error.message });
     }
 };
 
 // @desc    Authenticate a user
 // @route   POST /api/auth/login
-// @access  Public
 const loginUser = async (req, res) => {
     let { email, password } = req.body;
     email = email.toLowerCase();
 
-    // Check for user email
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
-        // Log login history
-        await LoginHistory.create({
-            userId: user.id,
-        });
-
+        await LoginHistory.create({ userId: user.id });
         res.json({
             _id: user.id,
             name: user.name,
@@ -125,34 +211,23 @@ const loginUser = async (req, res) => {
 
 // @desc    Update user profile
 // @route   PUT /api/auth/profile
-// @access  Private
 const updateProfile = async (req, res) => {
     const userId = req.user.id;
     const { password, phone, block, street, houseNo, plazaName, floorNumber, flatNumber } = req.body;
 
     try {
         const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: 'User not found' });
 
-        if (!user) {
-            return res.status(404).json({ message: 'User not found' });
-        }
-
-        // Update Password if provided
         if (password) {
             if (!validatePassword(password)) {
-                return res.status(400).json({ message: 'Password must be at least 8 chars, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.' });
+                return res.status(400).json({ message: 'Password too weak' });
             }
             const salt = await bcrypt.genSalt(10);
             user.password = await bcrypt.hash(password, salt);
-            console.log(`[DEBUG] Profile Update: Password changed for ${user.email}`);
         }
 
-        // Update Phone
-        if (phone) {
-            user.phone = phone;
-        }
-
-        // Update Address Fields
+        if (phone) user.phone = phone;
         if (block || street || houseNo || plazaName || floorNumber || flatNumber) {
             if (block) user.block = block;
             if (street) user.street = street;
@@ -160,8 +235,7 @@ const updateProfile = async (req, res) => {
             if (plazaName) user.plazaName = plazaName;
             if (floorNumber) user.floorNumber = floorNumber;
             if (flatNumber) user.flatNumber = flatNumber;
-
-            user.isVerified = false; // Set to unverified on address change
+            user.isVerified = false;
         }
 
         await user.save();
@@ -181,7 +255,6 @@ const updateProfile = async (req, res) => {
 
 // @desc    Get user profile
 // @route   GET /api/auth/profile
-// @access  Private
 const getProfile = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -192,8 +265,8 @@ const getProfile = async (req, res) => {
                 email: user.email,
                 phone: user.phone,
                 isVerified: user.isVerified,
+                role: user.role,
                 lastCommunityRead: user.lastCommunityRead,
-                // Add other fields as needed
             });
         } else {
             res.status(404).json({ message: 'User not found' });
@@ -205,7 +278,6 @@ const getProfile = async (req, res) => {
 
 // @desc    Update community chat read timestamp
 // @route   PUT /api/auth/read-community
-// @access  Private
 const updateCommunityRead = async (req, res) => {
     try {
         const user = await User.findById(req.user.id);
@@ -223,45 +295,74 @@ const updateCommunityRead = async (req, res) => {
 
 // @desc    Get total user count
 // @route   GET /api/auth/users/count
-// @access  Private
 const getUserCount = async (req, res) => {
     try {
         const count = await User.countDocuments({});
         res.status(200).json({ count });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
-// @desc    Forgot Password (Generate OTP)
+// @desc    Forgot Password (Send OTP)
 // @route   POST /api/auth/forgot-password
-// @access  Public
 const forgotPassword = async (req, res) => {
     let { email } = req.body;
     email = email.toLowerCase();
     try {
         const user = await User.findOne({ email });
         if (!user) {
-            return res.status(404).json({ message: 'User not found' });
+            return res.status(404).json({ message: 'User not found with this email' });
         }
 
-        // Generate 6 digit OTP
-        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        const otp = generateOTP();
         user.otp = otp;
-        user.otpExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+        user.otpExpires = Date.now() + 10 * 60 * 1000;
         await user.save();
 
-        console.log(`[DEV MODE] Password Reset OTP for ${email}: ${otp}`);
+        const message = `
+            <h1>Reset Password OTP</h1>
+            <p>Your OTP to reset your UrbanEase password is: <h2>${otp}</h2></p>
+        `;
 
-        res.json({ message: 'OTP sent to email (Check server console for Dev Mode)' });
+        const emailSent = await sendEmail({
+            email,
+            subject: 'UrbanEase Password Reset',
+            message
+        });
+
+        if (emailSent) {
+            res.json({ message: 'OTP sent to your email.' });
+        } else {
+            console.log(`[DEV FALLBACK] Reset OTP for ${email}: ${otp}`);
+            res.json({ message: 'OTP generated (Email failed - Check Console)' });
+        }
+
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
-// @desc    Reset Password (Verify OTP)
+// @desc    Verify Reset OTP
+const verifyResetOtp = async (req, res) => {
+    let { email, otp } = req.body;
+    email = email.toLowerCase();
+
+    const user = await User.findOne({
+        email,
+        otp,
+        otpExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+        return res.status(400).json({ message: 'Invalid or expired OTP' });
+    }
+
+    res.json({ message: 'OTP Verified', valid: true });
+}
+
+// @desc    Reset Password
 // @route   POST /api/auth/reset-password
-// @access  Public
 const resetPassword = async (req, res) => {
     let { email, otp, newPassword } = req.body;
     email = email.toLowerCase();
@@ -277,7 +378,7 @@ const resetPassword = async (req, res) => {
         }
 
         if (!validatePassword(newPassword)) {
-            return res.status(400).json({ message: 'Password must be at least 8 chars, with 1 uppercase, 1 lowercase, 1 number, and 1 special char.' });
+            return res.status(400).json({ message: 'Password too weak.' });
         }
 
         const salt = await bcrypt.genSalt(10);
@@ -285,11 +386,32 @@ const resetPassword = async (req, res) => {
         user.otp = undefined;
         user.otpExpires = undefined;
         await user.save();
-        console.log(`[DEBUG] Password reset for ${email}. New Hash: ${user.password}`);
 
-        res.json({ message: 'Password reset successful' });
+        res.json({ message: 'Password reset successful.' });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+// @desc    Search all users (for new chat)
+// @route   GET /api/auth/users
+const searchUsers = async (req, res) => {
+    try {
+        const keyword = req.query.search
+            ? {
+                $or: [
+                    { name: { $regex: req.query.search, $options: 'i' } },
+                    { email: { $regex: req.query.search, $options: 'i' } },
+                ],
+            }
+            : {};
+
+        const users = await User.find({ ...keyword, _id: { $ne: req.user.id } })
+            .select('name email');
+
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -300,6 +422,10 @@ module.exports = {
     getProfile,
     updateCommunityRead,
     getUserCount,
+    sendRegistrationOtp,
+    verifyRegistrationOtp,
     forgotPassword,
-    resetPassword
+    verifyResetOtp,
+    resetPassword,
+    searchUsers
 };

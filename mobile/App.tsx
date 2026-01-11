@@ -11,8 +11,10 @@ import WelcomeScreen from './src/components/WelcomeScreen';
 import LoginScreen from './src/components/LoginScreen';
 import SignupScreen from './src/components/SignupScreen';
 import BottomNav from './src/components/BottomNav';
-import BillsScreen from './src/components/BillsScreen';
-import BillDetails from './src/components/BillDetails';
+import Link from './src/components/BottomNav'; // Keeping original import if name matches
+// Decreased usage of BillsScreen
+import CarpoolScreen from './src/components/CarpoolScreen';
+import CarpoolForm from './src/components/CarpoolForm';
 import NewComplaint from './src/components/NewComplaint';
 import EditProfileScreen from './src/components/EditProfileScreen';
 import CommunityChat from './src/components/CommunityChat';
@@ -47,8 +49,8 @@ const AppNavigator = () => {
                     <Stack.Screen name="Home" component={BottomNav} />
 
                     {/* Screens not in Bottom Nav but accessible from Home */}
-                    <Stack.Screen name="Bills" component={BillsScreen} />
-                    <Stack.Screen name="BillDetails" component={BillDetails} />
+                    <Stack.Screen name="Carpool" component={CarpoolScreen} />
+                    <Stack.Screen name="CarpoolForm" component={CarpoolForm} />
                     <Stack.Screen name="NewComplaint" component={NewComplaint} />
                     <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                     <Stack.Screen name="CommunityChatDetail" component={CommunityChat} />

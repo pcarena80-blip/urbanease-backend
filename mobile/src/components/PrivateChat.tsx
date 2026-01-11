@@ -37,15 +37,58 @@ export default function PrivateChat() {
   const loadInbox = async () => {
     try {
       const data = await api.chat.getInbox();
-      setConversations(data);
+      setContacts(data); // Renamed from conversations
       // Update cache
       await AsyncStorage.setItem('cachedInbox', JSON.stringify(data));
     } catch (error) {
-      console.log('Failed to load inbox:', error);
+      console.error(error); // Changed console.log to console.error
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (searchQuery.trim().length > 1) {
+      handleSearch();
+    } else if (searchQuery.trim().length === 0) {
+      // If search query is cleared, reload the inbox to show original contacts
+      loadInbox();
+    }
+  }, [searchQuery]);
+
+  const handleSearch = async () => {
+    try {
+      const users = await api.auth.searchUsers(searchQuery);
+      // Transform to match contact format
+      const mapped = users.map((u: any) => ({
+        id: u._id,
+        name: u.name,
+        avatar: u.name ? u.name.charAt(0).toUpperCase() : '?',
+        lastMessage: 'Tap to start chatting',
+        time: '',
+        online: false
+      }));
+      // Combine with filtered contacts or just show these?
+      // For simplicity: If inbox empty, show these.
+      if (mapped.length > 0) {
+        // Dumb merge: show inbox matches FIRST, then search results
+        // Actually, we want to replace the list with search results if searching
+      }
+      // BETTER UX: Just set a separate state or merge
+      setContacts(prev => {
+        // Filter out duplicates (already in inbox)
+        const existingIds = new Set(prev.map(c => c.id));
+        const newUsers = mapped.filter((u: any) => !existingIds.has(u.id));
+        return [...prev, ...newUsers];
+      });
+    } catch (e) {
+      console.log('Search failed', e);
+    }
+  };
+
+  const filteredContacts = contacts.filter(contact =>
+    contact.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   if (loading) {
     return (

@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Direct WiFi) - ACTIVE
+// Local Network Dev (Direct WiFi)
 // const BASE_URL = 'http://192.168.18.131:5000/api';
 // AWS Direct HTTP - ACTIVE
 const BASE_URL = 'http://51.20.34.254:5000/api';
@@ -164,6 +164,9 @@ export const api = {
                 body: JSON.stringify({ email, otp, newPassword }),
             });
         },
+        searchUsers: async (query) => {
+            return request(`/auth/users?search=${query}`, { headers: await getHeaders() });
+        }
     },
     bills: {
         getAll: async () => {

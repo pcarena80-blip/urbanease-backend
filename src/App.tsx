@@ -7,8 +7,8 @@ import ForgotPasswordScreen from './components/ForgotPasswordScreen';
 import HomeScreen from './components/HomeScreen';
 import NoticeBoard from './components/NoticeBoard';
 import NoticeDetails from './components/NoticeDetails';
-import BillsScreen from './components/BillsScreen';
-import BillDetails from './components/BillDetails';
+import CarpoolScreen from './components/CarpoolScreen';
+import CarpoolForm from './components/CarpoolForm';
 import ComplaintsScreen from './components/ComplaintsScreen';
 import NewComplaint from './components/NewComplaint';
 import ComplaintDetails from './components/ComplaintDetails';
@@ -25,13 +25,11 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState('welcome');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [selectedNotice, setSelectedNotice] = useState(null);
-  const [selectedBill, setSelectedBill] = useState(null);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [selectedChat, setSelectedChat] = useState(null);
 
   const navigate = (screen: string, data?: any) => {
     if (data?.notice) setSelectedNotice(data.notice);
-    if (data?.bill) setSelectedBill(data.bill);
     if (data?.complaint) setSelectedComplaint(data.complaint);
     if (data?.chat) setSelectedChat(data.chat);
     setCurrentScreen(screen);
@@ -70,8 +68,8 @@ export default function App() {
           {currentScreen === 'home' && <HomeScreen onNavigate={navigate} />}
           {currentScreen === 'notices' && <NoticeBoard onNavigate={navigate} />}
           {currentScreen === 'notice-details' && <NoticeDetails notice={selectedNotice} onNavigate={navigate} />}
-          {currentScreen === 'bills' && <BillsScreen onNavigate={navigate} />}
-          {currentScreen === 'bill-details' && <BillDetails bill={selectedBill} onNavigate={navigate} />}
+          {currentScreen === 'carpool' && <CarpoolScreen onNavigate={navigate} />}
+          {currentScreen === 'carpool-form' && <CarpoolForm onNavigate={navigate} />}
           {currentScreen === 'complaints' && <ComplaintsScreen onNavigate={navigate} />}
           {currentScreen === 'new-complaint' && <NewComplaint onNavigate={navigate} />}
           {currentScreen === 'complaint-details' && <ComplaintDetails complaint={selectedComplaint} onNavigate={navigate} />}

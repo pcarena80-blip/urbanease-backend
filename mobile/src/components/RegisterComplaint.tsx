@@ -64,8 +64,8 @@ export default function RegisterComplaint({ onNavigate }: { onNavigate: (screen:
               className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#00c878]/20 focus:border-[#00c878] bg-white"
             >
               <option value="">Select category</option>
-              {categories.map((cat) => (
-                <option key={cat} value={cat}>{cat}</option>
+              {categories.map((cat, index) => (
+                <option key={cat || index} value={cat}>{cat}</option>
               ))}
             </select>
           </div>

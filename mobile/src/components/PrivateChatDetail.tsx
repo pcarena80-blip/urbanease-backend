@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, Paperclip } from 'lucide-react-native';
+import { ArrowLeft, Send, Paperclip, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ImageViewer from './ImageViewer';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function PrivateChatDetail() {
     const navigation = useNavigation<any>();
@@ -17,6 +18,7 @@ export default function PrivateChatDetail() {
     const [user, setUser] = useState<any>(null);
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
     const flatListRef = useRef<FlatList>(null);
 
     useEffect(() => {
@@ -73,22 +75,57 @@ export default function PrivateChatDetail() {
         }
     };
 
+    const pickImage = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                quality: 0.7,
+            });
+
+            if (!result.canceled) {
+                setSelectedImage(result.assets[0]);
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Failed to pick image');
+        }
+    };
+
     if (!chat) return null;
 
-    // Mock messages removed
-
     const handleSend = async () => {
-        if (!messageText.trim()) return;
+        if (!messageText.trim() && !selectedImage) return;
 
         try {
-            await api.chat.sendMessage({
-                receiverId: chat.id,
-                message: messageText
-            });
+            if (selectedImage) {
+                const formData = new FormData();
+                formData.append('receiverId', chat.id);
+                if (messageText.trim()) {
+                    formData.append('message', messageText);
+                }
+
+                // Append file
+                // @ts-ignore
+                formData.append('file', {
+                    uri: selectedImage.uri,
+                    type: 'image/jpeg', // Force jpeg or use mimeType from picker
+                    name: 'upload.jpg',
+                });
+
+                await api.chat.sendMessage(formData);
+            } else {
+                await api.chat.sendMessage({
+                    receiverId: chat.id,
+                    message: messageText
+                });
+            }
+
             setMessageText('');
+            setSelectedImage(null);
             loadMessages();
         } catch (error) {
             console.error('Send failed:', error);
+            Alert.alert('Error', 'Failed to send message');
         }
     };
 
@@ -201,10 +238,31 @@ export default function PrivateChatDetail() {
                         className="flex-1 bg-gray-50"
                     />
 
+                    {/* Image Preview */}
+                    {selectedImage && (
+                        <View className="px-4 py-2 bg-gray-100 border-t border-gray-200">
+                            <View className="relative w-20 h-20">
+                                <Image
+                                    source={{ uri: selectedImage.uri }}
+                                    className="w-20 h-20 rounded-lg"
+                                />
+                                <TouchableOpacity
+                                    onPress={() => setSelectedImage(null)}
+                                    className="absolute -top-2 -right-2 bg-gray-200 rounded-full p-1"
+                                >
+                                    <X size={16} color="black" />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
+
                     {/* Input Bar - Now properly positioned with KeyboardAvoidingView */}
                     <View className="bg-white border-t border-gray-100 px-4 py-3">
                         <View className="flex-row items-center gap-3">
-                            <TouchableOpacity className="text-gray-400">
+                            <TouchableOpacity
+                                onPress={pickImage}
+                                className="text-gray-400"
+                            >
                                 <Paperclip size={20} color="#9CA3AF" strokeWidth={1.5} />
                             </TouchableOpacity>
                             <TextInput

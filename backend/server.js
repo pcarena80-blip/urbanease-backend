@@ -7,23 +7,26 @@ const path = require('path');
 // Load environment variables
 dotenv.config();
 
+const compression = require('compression');
+
 // Initialize Express
 const app = express();
 
 // Middleware
+app.use(compression()); // Compress all responses
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Serve static files (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '1d' })); // Cache static files
 
 // Connect to MongoDB
 const connectDB = async () => {
     try {
         const conn = await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/urbanease', {
-            // useNewUrlParser: true, // Deprecated in newer Mongoose
-            // useUnifiedTopology: true // Deprecated in newer Mongoose
+            autoIndex: true, // Build indexes
+            maxPoolSize: 10 // Maintain up to 10 socket connections
         });
         console.log(`MongoDB Connected: ${conn.connection.host}`);
     } catch (error) {
@@ -42,6 +45,7 @@ app.use('/api/bills', require('./routes/billRoutes'));
 app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
+app.use('/api/carpool', require('./routes/carpoolRoutes'));
 
 // Default Route
 app.get('/', (req, res) => {

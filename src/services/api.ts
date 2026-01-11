@@ -1,5 +1,5 @@
 
-const BASE_URL = '/api';
+export const BASE_URL = '/api';
 
 const handleResponse = async (response: Response) => {
     const data = await response.json();

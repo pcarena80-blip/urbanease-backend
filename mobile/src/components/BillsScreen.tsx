@@ -144,8 +144,8 @@ export default function BillsScreen() {
           </View>
         ) : (
           <View className="gap-y-4">
-            {bills.map((bill) => (
-              <View key={bill._id} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
+            {bills.map((bill, index) => (
+              <View key={bill._id || index} className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
 
                 {/* Bill Header */}
                 <View className="flex-row justify-between items-start mb-4">

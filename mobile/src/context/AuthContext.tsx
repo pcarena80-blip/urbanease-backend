@@ -59,22 +59,34 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         try {
             console.log('Prefetching app data...');
             // Fetch all critical data in parallel
-            const promises = [
-                api.notices.getAll().catch(err => { console.log('Notices fetch failed:', err); return []; }),
-                api.bills.getAll().catch(err => { console.log('Bills fetch failed:', err); return []; }),
-                api.complaints.getAll().catch(err => { console.log('Complaints fetch failed:', err); return []; }),
-                api.chat.getMessages('community').catch(err => { console.log('Community chat fetch failed:', err); return []; }),
-                api.chat.getInbox().catch(err => { console.log('Inbox fetch failed:', err); return []; }),
-            ];
+            // We use allSettled to ensure one failure doesn't stop others
+            const results = await Promise.allSettled([
+                api.notices.getAll(),
+                api.bills.getAll(),
+                api.complaints.getAll(),
+                api.chat.getMessages('community'),
+                api.chat.getInbox()
+            ]);
 
-            const [notices, bills, complaints, communityMessages, inbox] = await Promise.all(promises);
+            const notices = results[0].status === 'fulfilled' ? results[0].value : [];
+            const bills = results[1].status === 'fulfilled' ? results[1].value : [];
+            const complaints = results[2].status === 'fulfilled' ? results[2].value : [];
+            const communityMessages = results[3].status === 'fulfilled' ? results[3].value : [];
+            const inbox = results[4].status === 'fulfilled' ? results[4].value : [];
+
+            // Log failures for debugging but don't block app
+            results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                    console.warn(`Prefetch failed for index ${index}:`, result.reason);
+                }
+            });
 
             // Cache data in AsyncStorage for instant load next time
-            if (notices) await AsyncStorage.setItem('cachedNotices', JSON.stringify(notices));
-            if (bills) await AsyncStorage.setItem('cachedBills', JSON.stringify(bills));
-            if (complaints) await AsyncStorage.setItem('cachedComplaints', JSON.stringify(complaints));
-            if (communityMessages) await AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(communityMessages));
-            if (inbox) await AsyncStorage.setItem('cachedInbox', JSON.stringify(inbox));
+            if (results[0].status === 'fulfilled') await AsyncStorage.setItem('cachedNotices', JSON.stringify(notices));
+            if (results[1].status === 'fulfilled') await AsyncStorage.setItem('cachedBills', JSON.stringify(bills));
+            if (results[2].status === 'fulfilled') await AsyncStorage.setItem('cachedComplaints', JSON.stringify(complaints));
+            if (results[3].status === 'fulfilled') await AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(communityMessages));
+            if (results[4].status === 'fulfilled') await AsyncStorage.setItem('cachedInbox', JSON.stringify(inbox));
 
             console.log('Data prefetch complete!');
         } catch (error) {

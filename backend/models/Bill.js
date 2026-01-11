@@ -1,18 +1,18 @@
 const mongoose = require('mongoose');
 
 const billSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     consumerId: { type: String, required: true, index: true }, // IESCO/SNGPL Consumer ID or internal ID
-    type: { type: String, required: true }, // electricity, gas, maintenance
+    type: { type: String, required: true, index: true }, // electricity, gas, maintenance
     provider: { type: String, required: true }, // IESCO, SNGPL, Urban Ease Residency
     billId: { type: String, required: true, unique: true }, // Printable Bill ID (EB-..., GB-...)
-    referenceId: { type: String, required: true, unique: true }, // CRITICAL: Payment Reference
+    referenceId: { type: String, required: true, unique: true, index: true }, // CRITICAL: Payment Reference
     amount: { type: Number, required: true },
     dueDate: { type: String, required: true },
-    billingMonth: { type: String, required: true }, // December 2025
+    billingMonth: { type: String, required: true, index: true }, // December 2025
 
     // Type Specific Fields
-    status: { type: String, enum: ['paid', 'due', 'upcoming', 'failed'], default: 'due' },
+    status: { type: String, enum: ['paid', 'due', 'upcoming', 'failed'], default: 'due', index: true },
     meterReading: {
         previous: { type: Number },
         current: { type: Number }

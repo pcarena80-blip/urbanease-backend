@@ -179,7 +179,7 @@ export default function ComplaintsScreen() {
 
             return (
               <TouchableOpacity
-                key={complaint._id || complaint.id || index}
+                key={complaint._id || index}
                 onPress={() => navigation.navigate('ComplaintDetails', { complaint })}
                 className="bg-white rounded-2xl p-4 shadow-sm mb-3"
               >
