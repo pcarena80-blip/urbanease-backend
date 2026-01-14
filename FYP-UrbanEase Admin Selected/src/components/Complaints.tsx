@@ -23,7 +23,7 @@ interface Complaint {
 
 export function Complaints() {
   const { theme } = useTheme();
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState('active'); // Changed default to 'active'
   const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,6 +56,8 @@ export function Complaints() {
 
   const filteredComplaints = complaints.filter((c) => {
     if (filter === 'all') return true;
+    if (filter === 'active') return ['pending', 'in-progress'].includes(c.status);
+    if (filter === 'history') return ['resolved', 'rejected'].includes(c.status);
     return c.status === filter;
   });
 
@@ -83,7 +85,6 @@ export function Complaints() {
           </span>
         );
       case 'rejected':
-      case 'canceled':
         return (
           <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-300' : 'bg-gray-200 text-gray-600'} text-sm`}>
             <XCircle className="w-4 h-4" />
@@ -111,18 +112,20 @@ export function Complaints() {
         <div className="flex items-center gap-3">
           <Filter className={`w-5 h-5 ${theme === 'dark' ? 'text-white opacity-70' : 'text-gray-600'}`} />
           <div className="flex gap-2">
-            {['all', 'pending', 'in-progress', 'resolved', 'rejected'].map((f) => (
+            {['active', 'pending', 'in-progress', 'history'].map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg transition-colors capitalize ${filter === f
-                  ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
-                  : theme === 'dark'
-                    ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    ? f === 'history'
+                      ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+                      : 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+                    : theme === 'dark'
+                      ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
               >
-                {f.replace('-', ' ')}
+                {f === 'history' ? '📜 History' : f.replace('-', ' ')}
               </button>
             ))}
           </div>
@@ -196,28 +199,36 @@ export function Complaints() {
 
                 <div className={`mt-4 pt-4 ${theme === 'dark' ? 'border-[#333333]' : 'border-gray-200'} border-t`}>
                   <p className={`text-sm mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Change Status:</p>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleUpdateStatus(complaint._id, 'pending')}
-                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'} rounded-lg transition-colors text-sm`}>
-                      Mark Pending
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(complaint._id, 'in-progress')}
-                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} rounded-lg transition-colors text-sm`}>
-                      In Progress
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(complaint._id, 'resolved')}
-                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'} rounded-lg transition-colors text-sm`}>
-                      Resolve
-                    </button>
-                    <button
-                      onClick={() => handleUpdateStatus(complaint._id, 'rejected')}
-                      className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-lg transition-colors text-sm`}>
-                      Reject
-                    </button>
-                  </div>
+                  {(complaint.status === 'resolved' || complaint.status === 'rejected') ? (
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'} italic`}>
+                      Status is locked. This complaint has been {complaint.status} and cannot be modified.
+                    </p>
+                  ) : (
+                    <div className="flex gap-2 flex-wrap">
+                      <button
+                        onClick={() => handleUpdateStatus(complaint._id, 'pending')}
+                        disabled={complaint.status === 'pending'}
+                        className={`px-4 py-2 ${complaint.status === 'pending' ? 'opacity-50 cursor-not-allowed' : ''} ${theme === 'dark' ? 'bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30' : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'} rounded-lg transition-colors text-sm`}>
+                        Mark Pending
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(complaint._id, 'in-progress')}
+                        disabled={complaint.status === 'in-progress'}
+                        className={`px-4 py-2 ${complaint.status === 'in-progress' ? 'opacity-50 cursor-not-allowed' : ''} ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400 hover:bg-blue-500/30' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'} rounded-lg transition-colors text-sm`}>
+                        In Progress
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(complaint._id, 'resolved')}
+                        className={`px-4 py-2 ${theme === 'dark' ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30' : 'bg-green-100 text-green-700 hover:bg-green-200'} rounded-lg transition-colors text-sm`}>
+                        ✓ Resolve
+                      </button>
+                      <button
+                        onClick={() => handleUpdateStatus(complaint._id, 'rejected')}
+                        className={`px-4 py-2 ${theme === 'dark' ? 'bg-gray-700 text-gray-300 hover:bg-gray-600' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'} rounded-lg transition-colors text-sm`}>
+                        Reject
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

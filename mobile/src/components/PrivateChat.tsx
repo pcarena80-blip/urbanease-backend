@@ -10,6 +10,7 @@ export default function PrivateChat() {
   const navigation = useNavigation<any>();
   const [conversations, setConversations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     loadCachedInbox();
@@ -37,11 +38,11 @@ export default function PrivateChat() {
   const loadInbox = async () => {
     try {
       const data = await api.chat.getInbox();
-      setContacts(data); // Renamed from conversations
+      setConversations(data);
       // Update cache
       await AsyncStorage.setItem('cachedInbox', JSON.stringify(data));
     } catch (error) {
-      console.error(error); // Changed console.log to console.error
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -66,16 +67,11 @@ export default function PrivateChat() {
         avatar: u.name ? u.name.charAt(0).toUpperCase() : '?',
         lastMessage: 'Tap to start chatting',
         time: '',
-        online: false
+        online: false,
+        unreadCount: 0
       }));
-      // Combine with filtered contacts or just show these?
-      // For simplicity: If inbox empty, show these.
-      if (mapped.length > 0) {
-        // Dumb merge: show inbox matches FIRST, then search results
-        // Actually, we want to replace the list with search results if searching
-      }
-      // BETTER UX: Just set a separate state or merge
-      setContacts(prev => {
+
+      setConversations(prev => {
         // Filter out duplicates (already in inbox)
         const existingIds = new Set(prev.map(c => c.id));
         const newUsers = mapped.filter((u: any) => !existingIds.has(u.id));
@@ -86,7 +82,7 @@ export default function PrivateChat() {
     }
   };
 
-  const filteredContacts = contacts.filter(contact =>
+  const filteredContacts = conversations.filter(contact =>
     contact.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -102,13 +98,13 @@ export default function PrivateChat() {
     <View className="flex-1 bg-white">
       {/* Content */}
       <ScrollView className="flex-1" contentContainerStyle={{ paddingBottom: 100 }}>
-        {conversations.length === 0 ? (
+        {filteredContacts.length === 0 ? (
           <View className="flex-1 items-center justify-center py-20">
             <Text className="text-gray-400 text-base">No conversations yet</Text>
             <Text className="text-gray-400 text-sm mt-2">Start a chat from Community Chat</Text>
           </View>
         ) : (
-          conversations.map((contact) => (
+          filteredContacts.map((contact) => (
             <TouchableOpacity
               key={contact.id}
               onPress={() => navigation.navigate('PrivateChatDetail', { chat: contact })}

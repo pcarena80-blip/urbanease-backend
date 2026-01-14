@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { useState, useEffect, useRef } from "react";
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from 'react-native';
 import {
   Building2,
   User,
@@ -11,12 +11,130 @@ import {
   Eye,
   EyeOff,
   Check,
-  ShieldCheck
+  ShieldCheck,
+  X,
+  FileText,
+  Shield
 } from "lucide-react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../services/api';
 import StatusModal from './common/StatusModal';
+
+// Terms and Conditions content
+const TERMS_CONTENT = `UrbanEase - Terms & Conditions
+Last Updated: 14th January 2026
+
+1. Acceptance of Terms
+By registering, accessing, or using the Smart Society Management System ("App"), you agree to be bound by these Terms & Conditions. If you do not agree, please do not use the App.
+
+2. Purpose of the App
+This App is designed to manage residential society operations including, but not limited to:
+• Resident registration and verification
+• Complaints and notices
+• Society announcements
+• Records management
+• Communication between residents and administration
+
+3. User Eligibility
+• Users must provide accurate and valid information during registration.
+• Providing fake, misleading, or incomplete information is strictly prohibited.
+• Each user is responsible for maintaining the confidentiality of their account credentials.
+
+4. User Responsibilities
+Users agree to:
+• Use the App only for lawful society-related purposes
+• Not misuse complaints, notices, or messaging features
+• Not upload false, abusive, offensive, or harmful content
+• Follow all society rules and regulations
+
+5. Account Usage
+• Each user may maintain only one account.
+• Sharing accounts is not permitted.
+• The administration reserves the right to suspend or terminate accounts involved in suspicious or fraudulent activities.
+
+6. Prohibited Activities
+Users must not:
+• Use abusive or inappropriate language
+• Submit fake complaints or spam content
+• Attempt to access unauthorized data or accounts
+• Interfere with the App's security or functionality
+
+7. Account Suspension or Termination
+The App administration reserves the right to:
+• Temporarily suspend or permanently terminate any account
+• Take action without prior notice if rules are violated
+
+8. Modification of Services
+We reserve the right to:
+• Modify, update, or discontinue any feature of the App
+• Update these Terms & Conditions at any time
+• Continued use of the App after changes means acceptance of the updated terms.
+
+9. Limitation of Liability
+The App is provided "as is". We are not responsible for:
+• Any indirect or incidental damages
+• Loss of data due to user negligence or technical issues
+
+10. Governing Law
+These Terms & Conditions shall be governed by the laws of Pakistan.`;
+
+// Privacy Policy content
+const PRIVACY_CONTENT = `UrbanEase - Privacy Policy
+Smart Society Management System
+Last Updated: 14th January 2026
+
+1. Introduction
+Your privacy is important to us. This Privacy Policy explains how we collect, use, store, and protect your personal information when you use our App.
+
+2. Information We Collect
+We may collect the following information:
+• Full Name
+• CNIC Number
+• Phone Number
+• House / Flat Number
+• Vehicle Information
+• Login and usage data
+
+3. Purpose of Data Collection
+Your data is collected strictly for:
+• Resident verification
+• Society management and record keeping
+• Handling complaints and notices
+• Communication between residents and management
+
+We do not sell or share your personal data with third parties.
+
+4. CNIC Data Protection
+• CNIC information is treated as highly confidential
+• CNIC data is used only for verification and legal purposes
+• CNIC numbers are not publicly visible to other users
+
+5. Data Security
+We implement appropriate security measures to:
+• Protect data from unauthorized access
+• Prevent misuse, loss, or alteration of information
+• However, no digital system is 100% secure.
+
+6. Data Retention
+User data is retained only as long as necessary for:
+• Society operations
+• Legal and administrative purposes
+
+7. User Rights
+Users have the right to:
+• Access their personal data
+• Request corrections
+• Request account deletion (subject to society policies)
+
+8. Third-Party Services
+The App may use trusted third-party services (e.g., hosting or analytics) that follow strict data protection standards.
+
+9. Changes to Privacy Policy
+We may update this Privacy Policy from time to time. Any changes will be posted within the App or on the website.
+
+10. Contact Information
+For any questions regarding these Terms or Privacy Policy, please contact the Society Office.`;
 
 export default function SignupScreen() {
   const navigation = useNavigation<any>();
@@ -43,6 +161,25 @@ export default function SignupScreen() {
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
+  const [timer, setTimer] = useState(60); // OTP Timer state
+  const countdownRef = useRef<NodeJS.Timeout | null>(null);
+
+  // OTP Timer Logic
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isOtpSent && timer > 0) {
+      interval = setInterval(() => {
+        setTimer((prev) => prev - 1);
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [isOtpSent, timer]);
+
+  // Terms and Privacy Modal States
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [hasReadTerms, setHasReadTerms] = useState(false);
+  const [hasReadPrivacy, setHasReadPrivacy] = useState(false);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -50,11 +187,73 @@ export default function SignupScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [modal, setModal] = useState({ visible: false, type: 'success' as 'success' | 'error', title: '', message: '' });
 
+  // Start OTP countdown timer (60 seconds)
+  const startOtpCountdown = () => {
+    setOtpCountdown(60);
+    if (countdownRef.current) clearInterval(countdownRef.current);
+    countdownRef.current = setInterval(() => {
+      setOtpCountdown(prev => {
+        if (prev <= 1) {
+          if (countdownRef.current) clearInterval(countdownRef.current);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  };
+
+  // Cleanup countdown on unmount
+  useEffect(() => {
+    return () => {
+      if (countdownRef.current) clearInterval(countdownRef.current);
+    };
+  }, []);
+
   const handleModalClose = () => {
     setModal(prev => ({ ...prev, visible: false }));
     if (modal.type === 'success') {
       navigation.navigate('Login');
     }
+  };
+
+  // Phone number handler - Fixed +92 prefix with exactly 10 digits
+  // Display format: +92 301-0816789
+  const handlePhoneChange = (text: string) => {
+    // Remove all non-digit characters
+    const digitsOnly = text.replace(/\D/g, '');
+
+    // If user somehow removed the 92 prefix, don't update
+    if (text.length < 3 && !text.startsWith('+92')) {
+      setFormData({ ...formData, phone: '+92' });
+      return;
+    }
+
+    // Extract digits after +92 (max 10 digits)
+    let phoneDigits = digitsOnly;
+    if (digitsOnly.startsWith('92')) {
+      phoneDigits = digitsOnly.substring(2);
+    }
+
+    // Limit to 10 digits after +92
+    phoneDigits = phoneDigits.substring(0, 10);
+
+    // Format as +92 301-0816789 (space after code, dash after 3rd digit)
+    let formatted = '+92';
+    if (phoneDigits.length > 0) {
+      formatted += ' ' + phoneDigits.substring(0, 3);
+      if (phoneDigits.length > 3) {
+        formatted += '-' + phoneDigits.substring(3);
+      }
+    }
+
+    setFormData({ ...formData, phone: formatted });
+  };
+
+  // Validate phone number - must be exactly +92 followed by 10 digits
+  const validatePhone = () => {
+    // Remove formatting for validation
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    return phoneDigits.length === 12; // 92 + 10 digits
   };
 
   const handleSendOtp = async () => {
@@ -72,7 +271,8 @@ export default function SignupScreen() {
     try {
       await api.auth.sendOtp(formData.email);
       setIsOtpSent(true);
-      Alert.alert('Success', 'OTP sent to ' + formData.email);
+      setTimer(60); // Start 60s timer
+      Alert.alert('Success', 'OTP sent to your email');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to send OTP');
     } finally {
@@ -85,14 +285,19 @@ export default function SignupScreen() {
       Alert.alert('Error', 'Enter valid 6-digit OTP');
       return;
     }
+    if (otpCountdown === 0) {
+      Alert.alert('Error', 'OTP has expired. Please request a new one.');
+      return;
+    }
     setOtpLoading(true);
     try {
       await api.auth.verifyOtp(formData.email, otp);
       setIsEmailVerified(true);
-      setIsOtpSent(false); // Hide OTP field
+      setIsOtpSent(false);
+      if (countdownRef.current) clearInterval(countdownRef.current);
       Alert.alert('Success', 'Email Verified Successfully!');
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Invalid OTP');
+      Alert.alert('Error', error.message || 'Invalid or expired OTP');
     } finally {
       setOtpLoading(false);
     }
@@ -106,6 +311,23 @@ export default function SignupScreen() {
 
     if (!formData.fullName || !formData.password || !formData.cnic) {
       Alert.alert('Error', 'Please fill in required fields');
+      return;
+    }
+
+    // Phone validation - must be exactly +92 followed by 10 digits
+    if (!validatePhone()) {
+      Alert.alert('Error', 'Phone number must be +92 followed by exactly 10 digits');
+      return;
+    }
+
+    // Terms and Privacy must be read and agreed
+    if (!hasReadTerms || !hasReadPrivacy) {
+      Alert.alert('Error', 'Please read both Terms & Conditions and Privacy Policy before agreeing');
+      return;
+    }
+
+    if (!formData.agreeTerms) {
+      Alert.alert('Error', 'You must agree to Terms & Conditions and Privacy Policy');
       return;
     }
 
@@ -128,7 +350,7 @@ export default function SignupScreen() {
         visible: true,
         type: 'success',
         title: 'Account Created!',
-        message: 'Your account has been successfully created. Please login to continue.'
+        message: 'Your account has been successfully created. Please wait for admin verification before you can login.'
       });
     } catch (error: any) {
       setModal({
@@ -221,7 +443,14 @@ export default function SignupScreen() {
                 {/* OTP Input Area */}
                 {isOtpSent && !isEmailVerified && (
                   <View className="mt-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <Text className="text-gray-600 text-xs mb-2">Enter OTP sent to {formData.email}</Text>
+                    <View className="flex-row items-center justify-between mb-3 bg-white p-2 rounded-lg border border-gray-100">
+                      <Text className="text-gray-600 text-xs ml-1">Sent to {formData.email}</Text>
+                      <View className={`px-2 py-1 rounded-md ${timer > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+                        <Text className={`text-xs font-bold ${timer > 0 ? 'text-[#027A4C]' : 'text-red-500'}`}>
+                          {timer > 0 ? `${timer}s` : 'Expired'}
+                        </Text>
+                      </View>
+                    </View>
                     <TextInput
                       value={otp}
                       onChangeText={setOtp}
@@ -251,7 +480,7 @@ export default function SignupScreen() {
 
               {/* Only show remaining fields if email is verified */}
               {isEmailVerified && (
-                <>
+                <View style={{ gap: 16 }}>
                   <View>
                     <Text className="text-gray-700 mb-2 text-xs font-medium">CNIC Number</Text>
                     <View className="relative">
@@ -282,17 +511,21 @@ export default function SignupScreen() {
                         <Phone size={16} color="#9CA3AF" strokeWidth={1.5} />
                       </View>
                       <TextInput
-                        value={formData.phone}
-                        onChangeText={(text) => {
-                          const filtered = text.replace(/[^0-9+\s-]/g, '');
-                          setFormData({ ...formData, phone: filtered });
-                        }}
-                        placeholder="+92 XXX XXXXXXX"
+                        value={formData.phone || '+92'}
+                        onChangeText={handlePhoneChange}
+                        placeholder="+92 301-0816789"
                         keyboardType="phone-pad"
-                        className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl bg-white"
+                        className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-white"
                         style={{ fontSize: 14 }}
+                        maxLength={15}
                       />
+                      {formData.phone && formData.phone.replace(/\D/g, '').length === 12 && (
+                        <View className="absolute right-3 top-3.5">
+                          <CheckCircle size={16} color="#027A4C" />
+                        </View>
+                      )}
                     </View>
+                    <Text className="text-gray-400 text-xs mt-1">Format: +92 301-0816789</Text>
                   </View>
 
                   <View>
@@ -383,17 +616,64 @@ export default function SignupScreen() {
                     </View>
                   </View>
 
-                  <TouchableOpacity className="flex-row items-center gap-2" onPress={() => setFormData({ ...formData, agreeTerms: !formData.agreeTerms })}>
-                    <View className={`w-4 h-4 rounded border items-center justify-center ${formData.agreeTerms ? 'bg-[#027A4C] border-[#027A4C]' : 'border-gray-300'}`}>{formData.agreeTerms && <Check size={10} color="white" strokeWidth={3} />}</View>
-                    <Text className="text-gray-600 text-xs">I agree to <Text className="text-[#027A4C] font-bold">Terms</Text> and <Text className="text-[#027A4C] font-bold">Privacy Policy</Text></Text>
-                  </TouchableOpacity>
+                  {/* Terms and Privacy Policy - Fixed UI */}
+                  <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+                    <TouchableOpacity
+                      onPress={() => {
+                        if (hasReadTerms && hasReadPrivacy) {
+                          setFormData({ ...formData, agreeTerms: !formData.agreeTerms });
+                        } else {
+                          Alert.alert('Read Required', 'Please tap on Terms & Conditions and Privacy Policy links to read them first.');
+                        }
+                      }}
+                      activeOpacity={0.7}
+                      style={{ flexDirection: 'row', alignItems: 'flex-start', paddingVertical: 12, paddingHorizontal: 4 }}
+                    >
+                      <View style={{
+                        width: 24,
+                        height: 24,
+                        borderRadius: 6,
+                        borderWidth: 2,
+                        borderColor: formData.agreeTerms ? '#027A4C' : (!hasReadTerms || !hasReadPrivacy) ? '#D1D5DB' : '#9CA3AF',
+                        backgroundColor: formData.agreeTerms ? '#027A4C' : (!hasReadTerms || !hasReadPrivacy) ? '#F3F4F6' : 'white',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        marginRight: 12
+                      }}>
+                        {formData.agreeTerms && <Check size={14} color="white" strokeWidth={3} />}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ color: '#4B5563', fontSize: 13, lineHeight: 20 }}>
+                          By registering, you agree to our{' '}
+                          <Text
+                            style={{ fontWeight: '700', color: hasReadTerms ? '#027A4C' : '#2563EB', textDecorationLine: hasReadTerms ? 'none' : 'underline' }}
+                            onPress={(e) => { e.stopPropagation && e.stopPropagation(); setShowTermsModal(true); }}
+                          >
+                            Terms & Conditions
+                          </Text>
+                          {' '}and{' '}
+                          <Text
+                            style={{ fontWeight: '700', color: hasReadPrivacy ? '#027A4C' : '#2563EB', textDecorationLine: hasReadPrivacy ? 'none' : 'underline' }}
+                            onPress={(e) => { e.stopPropagation && e.stopPropagation(); setShowPrivacyModal(true); }}
+                          >
+                            Privacy Policy
+                          </Text>
+                        </Text>
+                        {(!hasReadTerms || !hasReadPrivacy) && (
+                          <Text style={{ color: '#F97316', fontSize: 11, marginTop: 6 }}>
+                            ⚠️ Please tap and read both documents before agreeing
+                          </Text>
+                        )}
+                      </View>
+                    </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} disabled={isLoading}>
                     <LinearGradient colors={['#003E2F', '#027A4C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="w-full py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-md">
                       {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white text-base font-medium">Create Account</Text>}
                     </LinearGradient>
                   </TouchableOpacity>
-                </>
+                </View>
               )}
             </View>
           </View>
@@ -403,6 +683,65 @@ export default function SignupScreen() {
             <TouchableOpacity onPress={() => navigation.navigate("Login")}><Text className="text-[#027A4C] font-medium text-sm">Login</Text></TouchableOpacity>
           </View>
         </View>
+
+        {/* Terms & Conditions Modal */}
+        <Modal
+          visible={showTermsModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowTermsModal(false)}
+        >
+          <View className="flex-1 bg-white">
+            <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200">
+              <View className="flex-row items-center gap-2">
+                <FileText size={24} color="#027A4C" />
+                <Text className="text-lg font-semibold text-gray-900">Terms & Conditions</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setHasReadTerms(true);
+                  setShowTermsModal(false);
+                }}
+                className="bg-[#027A4C] px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white font-medium">I've Read This</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView className="flex-1 px-4 py-4">
+              <Text className="text-gray-700 text-sm leading-6">{TERMS_CONTENT}</Text>
+            </ScrollView>
+          </View>
+        </Modal>
+
+        {/* Privacy Policy Modal */}
+        <Modal
+          visible={showPrivacyModal}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setShowPrivacyModal(false)}
+        >
+          <View className="flex-1 bg-white">
+            <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200">
+              <View className="flex-row items-center gap-2">
+                <Shield size={24} color="#027A4C" />
+                <Text className="text-lg font-semibold text-gray-900">Privacy Policy</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setHasReadPrivacy(true);
+                  setShowPrivacyModal(false);
+                }}
+                className="bg-[#027A4C] px-4 py-2 rounded-lg"
+              >
+                <Text className="text-white font-medium">I've Read This</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView className="flex-1 px-4 py-4">
+              <Text className="text-gray-700 text-sm leading-6">{PRIVACY_CONTENT}</Text>
+            </ScrollView>
+          </View>
+        </Modal>
+
         <StatusModal visible={modal.visible} type={modal.type} title={modal.title} message={modal.message} onClose={handleModalClose} />
       </ScrollView>
     </KeyboardAvoidingView>

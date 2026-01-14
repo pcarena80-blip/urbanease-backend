@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Calendar } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, History, Bell, AlertCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 
@@ -14,19 +14,45 @@ interface Notice {
 export function Announcements() {
   const { theme } = useTheme();
   const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [notices, setNotices] = useState<Notice[]>([]);
+  const [historyNotices, setHistoryNotices] = useState<Notice[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Form State
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Get today's date in YYYY-MM-DD format for min attribute
+  const today = new Date().toISOString().split('T')[0];
 
   const fetchNotices = async () => {
     try {
+      setLoading(true);
       const response = await api.get('/admin/notices');
       setNotices(response.data);
     } catch (error) {
       console.error("Failed to fetch notices", error);
+      setError('Failed to load notices');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchHistoryNotices = async () => {
+    try {
+      setHistoryLoading(true);
+      const response = await api.get('/admin/notices/history');
+      setHistoryNotices(response.data);
+    } catch (error) {
+      console.error("Failed to fetch history notices", error);
+    } finally {
+      setHistoryLoading(false);
     }
   };
 
@@ -34,30 +60,88 @@ export function Announcements() {
     fetchNotices();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'history' && historyNotices.length === 0) {
+      fetchHistoryNotices();
+    }
+  }, [activeTab]);
+
+  const validateForm = (): boolean => {
+    setFormError(null);
+
+    if (!title.trim()) {
+      setFormError('Title is required');
+      return false;
+    }
+    if (!description.trim()) {
+      setFormError('Description is required');
+      return false;
+    }
+    if (!expiryDate) {
+      setFormError('Expiry date is required');
+      return false;
+    }
+
+    // Validate expiry date is not in the past
+    const selectedDate = new Date(expiryDate);
+    const todayDate = new Date();
+    todayDate.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate < todayDate) {
+      setFormError('Expiry date cannot be in the past');
+      return false;
+    }
+
+    return true;
+  };
+
   const handleCreateNotice = async () => {
-    if (!title || !description || !expiryDate) return alert('Please fill all fields');
+    if (!validateForm()) return;
+
     try {
+      setSubmitting(true);
+      setFormError(null);
       await api.post('/admin/notices', { title, description, expiryDate });
       setShowForm(false);
       setTitle('');
       setDescription('');
       setExpiryDate('');
-      fetchNotices(); // Refresh list
-    } catch (error) {
+      fetchNotices();
+    } catch (error: any) {
       console.error("Failed to create notice", error);
-      alert("Failed to create notice");
+      setFormError(error.response?.data?.message || "Failed to create notice");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const handleDeleteNotice = async (id: string) => {
-    if (!confirm('Are you sure?')) return;
+    if (!confirm('Are you sure you want to delete this notice?')) return;
     try {
       await api.delete(`/admin/notices/${id}`);
-      fetchNotices();
+      if (activeTab === 'active') {
+        fetchNotices();
+      } else {
+        fetchHistoryNotices();
+      }
     } catch (error) {
       console.error("Failed to delete notice", error);
     }
   };
+
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
+    });
+  };
+
+  const isExpired = (dateStr: string) => {
+    return new Date(dateStr) < new Date();
+  };
+
+  const displayNotices = activeTab === 'active' ? notices : historyNotices;
+  const isLoading = activeTab === 'active' ? loading : historyLoading;
 
   return (
     <div className="space-y-6">
@@ -75,56 +159,98 @@ export function Announcements() {
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-2">
+        <button
+          onClick={() => setActiveTab('active')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === 'active'
+              ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+              : theme === 'dark'
+                ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+        >
+          <Bell className="w-4 h-4" />
+          Active Notices ({notices.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('history')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === 'history'
+              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+              : theme === 'dark'
+                ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+        >
+          <History className="w-4 h-4" />
+          📜 History ({historyNotices.length})
+        </button>
+      </div>
+
+      {/* Create Form */}
       {showForm && (
         <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
           <h3 className={`text-lg mb-4 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>New Announcement</h3>
+
+          {formError && (
+            <div className={`mb-4 p-3 rounded-lg flex items-center gap-2 ${theme === 'dark' ? 'bg-red-900/20 text-red-400' : 'bg-red-50 text-red-600'}`}>
+              <AlertCircle className="w-5 h-5" />
+              {formError}
+            </div>
+          )}
+
           <div className="space-y-4">
             <div>
-              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Title</label>
+              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Title *</label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter announcement title"
                 className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               />
             </div>
             <div>
-              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Description</label>
+              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Description *</label>
               <textarea
                 rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Enter announcement details"
                 className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               ></textarea>
             </div>
             <div>
-              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Expiry Date</label>
+              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Expiry Date *</label>
               <input
                 type="date"
                 value={expiryDate}
+                min={today}
                 onChange={(e) => setExpiryDate(e.target.value)}
                 className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               />
+              <p className={`text-xs mt-1 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                Notice will move to history after this date
+              </p>
             </div>
             <div className="flex gap-3">
               <button
                 onClick={handleCreateNotice}
-                className="px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow">
-                Publish Announcement
+                disabled={submitting}
+                className={`px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow ${submitting ? 'opacity-70 cursor-not-allowed' : ''}`}>
+                {submitting ? 'Publishing...' : 'Publish Announcement'}
               </button>
               <button
-                onClick={() => setShowForm(false)}
+                onClick={() => { setShowForm(false); setFormError(null); }}
                 className={`px-6 py-3 ${theme === 'dark' ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} rounded-lg transition-colors`}
               >
                 Cancel
@@ -134,34 +260,55 @@ export function Announcements() {
         </div>
       )}
 
+      {/* Notices List */}
       <div className="grid gap-4">
-        {notices.map((announcement) => (
-          <div key={announcement._id} className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <h3 className={`text-lg mb-2 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{announcement.title}</h3>
-                <p className={`mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{announcement.description}</p>
-                <div className={`flex items-center gap-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>Created: {new Date(announcement.createdAt).toLocaleDateString()}</span>
+        {isLoading ? (
+          <div className="text-center py-8">
+            <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>Loading notices...</p>
+          </div>
+        ) : displayNotices.length === 0 ? (
+          <div className={`text-center py-12 ${theme === 'dark' ? 'bg-[#1F1F1F]' : 'bg-gray-50'} rounded-xl`}>
+            <History className={`w-12 h-12 mx-auto mb-3 ${theme === 'dark' ? 'text-gray-600' : 'text-gray-300'}`} />
+            <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>
+              {activeTab === 'active' ? 'No active notices' : 'No expired notices in history'}
+            </p>
+          </div>
+        ) : (
+          displayNotices.map((notice) => (
+            <div key={notice._id} className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border ${activeTab === 'history' ? 'opacity-70' : ''}`}>
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className={`text-lg ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{notice.title}</h3>
+                    {activeTab === 'history' && (
+                      <span className={`text-xs px-2 py-1 rounded-full ${theme === 'dark' ? 'bg-gray-700 text-gray-400' : 'bg-gray-200 text-gray-500'}`}>
+                        Expired
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>Expires: {new Date(announcement.expiryDate).toLocaleDateString()}</span>
+                  <p className={`mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{notice.description}</p>
+                  <div className={`flex items-center gap-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <div className="flex items-center gap-2">
+                      <Calendar className="w-4 h-4" />
+                      <span>Created: {formatDate(notice.createdAt)}</span>
+                    </div>
+                    <div className={`flex items-center gap-2 ${isExpired(notice.expiryDate) ? 'text-red-500' : ''}`}>
+                      <Clock className="w-4 h-4" />
+                      <span>{isExpired(notice.expiryDate) ? 'Expired' : 'Expires'}: {formatDate(notice.expiryDate)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleDeleteNotice(announcement._id)}
-                  className={`p-2 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg transition-colors`}>
-                  <Trash2 className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleDeleteNotice(notice._id)}
+                    className={`p-2 ${theme === 'dark' ? 'hover:bg-red-500/20' : 'hover:bg-red-50'} rounded-lg transition-colors`}>
+                    <Trash2 className={`w-5 h-5 ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );

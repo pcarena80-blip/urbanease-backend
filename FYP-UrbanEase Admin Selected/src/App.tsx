@@ -5,7 +5,7 @@ import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
 import { Residents } from './components/Residents';
-import { BillsPayments } from './components/BillsPayments';
+import { CarpoolManagement } from './components/CarpoolManagement';
 import { Complaints } from './components/Complaints';
 import { Announcements } from './components/Announcements';
 import { ChatModeration } from './components/ChatModeration';
@@ -40,8 +40,8 @@ function AppContent() {
         return <Dashboard />;
       case 'residents':
         return <Residents />;
-      case 'bills':
-        return <BillsPayments />;
+      case 'carpool':
+        return <CarpoolManagement />;
       case 'complaints':
         return <Complaints />;
       case 'announcements':

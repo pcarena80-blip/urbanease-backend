@@ -23,6 +23,8 @@ export default function CommunityChat() {
     const [lastReadMessageId, setLastReadMessageId] = useState<string | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const flatListRef = useRef<FlatList>(null);
+    const hasScrolledRef = useRef(false);
+    const isInitialLoadRef = useRef(true);
 
     useEffect(() => {
         loadUser();
@@ -30,37 +32,53 @@ export default function CommunityChat() {
         loadCachedMessages();
         loadMessages();
         loadUnreadCount();
-        const interval = setInterval(loadMessages, 5000);
+        // Reduced polling interval for better performance
+        const interval = setInterval(loadMessages, 10000); // 10 seconds instead of 5
         return () => {
             clearInterval(interval);
             markAsRead(); // Mark as read when leaving
         };
     }, []);
 
-    // Scroll to unread messages when messages load
-    useEffect(() => {
-        if (messages.length > 0 && flatListRef.current) {
-            setTimeout(() => {
-                if (lastReadMessageId) {
-                    const unreadIndex = messages.findIndex(m => m.id?.toString() === lastReadMessageId);
-                    if (unreadIndex > -1 && unreadIndex < messages.length - 1) {
-                        // Scroll to first unread message
-                        flatListRef.current?.scrollToIndex({
-                            index: unreadIndex + 1,
-                            animated: true,
-                            viewPosition: 0.5
-                        });
-                    } else {
-                        // All read, scroll to bottom
-                        flatListRef.current?.scrollToEnd({ animated: true });
-                    }
-                } else {
-                    // First time, scroll to bottom
-                    flatListRef.current?.scrollToEnd({ animated: true });
-                }
-            }, 300);
+    // Scroll to correct position on initial load only
+    const scrollToCorrectPosition = () => {
+        if (!flatListRef.current || messages.length === 0) return;
+
+        // Find first unread message index
+        let targetIndex = messages.length - 1; // Default: latest message
+
+        if (lastReadMessageId && unreadCount > 0) {
+            // Find the last read message and scroll to the one after it
+            const lastReadIndex = messages.findIndex(m => m.id?.toString() === lastReadMessageId);
+            if (lastReadIndex > -1 && lastReadIndex < messages.length - 1) {
+                targetIndex = lastReadIndex + 1; // First unread
+            }
         }
-    }, [messages.length]);
+
+        // Use scrollToIndex for precise positioning
+        try {
+            flatListRef.current.scrollToIndex({
+                index: targetIndex,
+                animated: false, // No animation on initial load for instant positioning
+                viewPosition: 0, // Show at top of viewport
+            });
+        } catch (e) {
+            // Fallback to scrollToEnd
+            flatListRef.current.scrollToEnd({ animated: false });
+        }
+    };
+
+    // Initial scroll effect - runs only once when messages first load
+    useEffect(() => {
+        if (messages.length > 0 && isInitialLoadRef.current && !hasScrolledRef.current) {
+            // Small delay to ensure FlatList has rendered
+            setTimeout(() => {
+                scrollToCorrectPosition();
+                hasScrolledRef.current = true;
+                isInitialLoadRef.current = false;
+            }, 100);
+        }
+    }, [messages.length, lastReadMessageId, unreadCount]);
 
     const loadUser = async () => {
         const userData = await AsyncStorage.getItem('user');
@@ -160,31 +178,93 @@ export default function CommunityChat() {
     };
 
     const handleSend = async () => {
-        if ((!messageText.trim() && !selectedImage)) return;
+        const msgText = messageText.trim();
+        const imgToSend = selectedImage;
+
+        if (!msgText && !imgToSend) return;
+
+        // Generate temp ID for optimistic message
+        const tempId = `temp-${Date.now()}`;
+        const userName = user?.name || 'You';
+        const userInitials = userName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+
+        // Create optimistic message immediately
+        const optimisticMessage = {
+            id: tempId,
+            sender: 'user',
+            senderId: user?._id,
+            name: userName,
+            avatar: userInitials,
+            message: msgText,
+            attachment: imgToSend?.uri,
+            attachmentType: imgToSend ? 'image' : null,
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            isPending: true,
+            isFailed: false
+        };
+
+        // Add to UI immediately (optimistic update)
+        setMessages(prev => [...prev, optimisticMessage]);
+        setMessageText('');
+        setSelectedImage(null);
+
+        // Scroll to bottom immediately
+        setTimeout(() => {
+            flatListRef.current?.scrollToEnd({ animated: true });
+        }, 50);
 
         try {
             const formData = new FormData();
             formData.append('receiverId', 'community');
 
-            if (messageText.trim()) {
-                formData.append('message', messageText);
+            if (msgText) {
+                formData.append('message', msgText);
             }
 
-            if (selectedImage) {
+            if (imgToSend) {
                 // @ts-ignore
                 formData.append('file', {
-                    uri: selectedImage.uri,
+                    uri: imgToSend.uri,
                     type: 'image/jpeg',
                     name: 'upload.jpg',
                 });
             }
 
-            await api.chat.sendMessage(formData);
-            setMessageText('');
-            setSelectedImage(null);
-            loadMessages();
-        } catch (error) {
-            Alert.alert('Error', 'Failed to send message');
+            const serverResponse = await api.chat.sendMessage(formData);
+
+            // Replace temp message with real one from server
+            setMessages(prev => prev.map(msg =>
+                msg.id === tempId
+                    ? { ...serverResponse, isPending: false, isFailed: false }
+                    : msg
+            ));
+
+            // Update cache with new messages
+            setMessages(prev => {
+                AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(prev));
+                return prev;
+            });
+
+        } catch (error: any) {
+            console.log('Send failed:', error);
+            // Mark message as failed, allow retry
+            setMessages(prev => prev.map(msg =>
+                msg.id === tempId
+                    ? { ...msg, isPending: false, isFailed: true }
+                    : msg
+            ));
+            Alert.alert('Send Failed', 'Tap message to retry');
+        }
+    };
+
+    // Retry a failed message
+    const handleRetryMessage = async (failedMsg: any) => {
+        // Remove failed message
+        setMessages(prev => prev.filter(m => m.id !== failedMsg.id));
+        // Re-send
+        setMessageText(failedMsg.message || '');
+        if (failedMsg.attachment && failedMsg.attachmentType === 'image') {
+            setSelectedImage({ uri: failedMsg.attachment });
         }
     };
 
@@ -200,7 +280,7 @@ export default function CommunityChat() {
     };
 
     const renderItem = ({ item: msg }: { item: any }) => (
-        <View className={`flex-row gap-3 mb-4 ${msg.sender === 'admin' ? 'justify-center' : ''} px-6`}>
+        <View className={`flex-row gap-3 mb-4 ${msg.sender === 'admin' ? 'justify-center' : ''} px-6 ${msg.isPending ? 'opacity-60' : ''} ${msg.isFailed ? 'opacity-40' : ''}`}>
             {msg.sender !== 'admin' && msg.sender !== 'user' && (
                 <TouchableOpacity
                     onPress={() => setSelectedUser(msg)}
@@ -222,15 +302,15 @@ export default function CommunityChat() {
                     </Text>
                 )}
 
-                {/* Image Message - NO green box, just clean image */}
+                {/* Image Message */}
                 {msg.attachment && msg.attachmentType === 'image' && (
                     <TouchableOpacity
-                        onPress={() => setViewerImage(api.getImageUrl(msg.attachment))}
+                        onPress={() => setViewerImage(msg.isPending ? msg.attachment : api.getImageUrl(msg.attachment))}
                         activeOpacity={0.9}
                         style={{ marginBottom: msg.message ? 8 : 0 }}
                     >
                         <Image
-                            source={{ uri: api.getImageUrl(msg.attachment) }}
+                            source={{ uri: msg.isPending ? msg.attachment : api.getImageUrl(msg.attachment) }}
                             style={{
                                 width: 200,
                                 height: 150,
@@ -244,30 +324,37 @@ export default function CommunityChat() {
                     </TouchableOpacity>
                 )}
 
-                {/* Text Message - WITH colored bubble */}
+                {/* Text Message */}
                 {msg.message ? (
                     <TouchableOpacity
-                        onPress={() => setSelectedMessage(msg)}
+                        onPress={() => msg.isFailed ? handleRetryMessage(msg) : setSelectedMessage(msg)}
                         activeOpacity={0.8}
                         className={`p-3.5 ${msg.sender === 'admin'
                             ? 'bg-gray-100 rounded-2xl'
                             : msg.sender === 'user'
-                                ? 'bg-[#027A4C] rounded-2xl rounded-tr-sm'
+                                ? msg.isFailed ? 'bg-red-500 rounded-2xl rounded-tr-sm' : 'bg-[#027A4C] rounded-2xl rounded-tr-sm'
                                 : 'bg-[#F5F5F5] rounded-2xl rounded-tl-sm'
                             }`}
                     >
                         <Text className={`${msg.sender === 'admin' ? 'text-gray-700 text-center' : msg.sender === 'user' ? 'text-white' : 'text-gray-900'} text-sm`}>
                             {msg.message}
                         </Text>
+                        {msg.isFailed && (
+                            <Text className="text-white text-xs mt-1">⚠️ Tap to retry</Text>
+                        )}
                     </TouchableOpacity>
                 ) : null}
-                <Text className={`text-gray-400 mt-1 text-[11px] ${msg.sender === 'user' ? 'text-right' : ''}`}>
-                    {msg.time}
-                </Text>
+                <View className="flex-row items-center gap-1 mt-1">
+                    <Text className={`text-gray-400 text-[11px] ${msg.sender === 'user' ? 'text-right' : ''}`}>
+                        {msg.time}
+                    </Text>
+                    {msg.isPending && <Text className="text-gray-400 text-[10px]">⏳</Text>}
+                    {msg.isFailed && <Text className="text-red-500 text-[10px]">❌</Text>}
+                </View>
             </View>
 
             {msg.sender === 'user' && (
-                <View className="w-9 h-9 rounded-full bg-[#027A4C] items-center justify-center flex-shrink-0">
+                <View className={`w-9 h-9 rounded-full ${msg.isFailed ? 'bg-red-500' : 'bg-[#027A4C]'} items-center justify-center flex-shrink-0`}>
                     <Text className="text-white text-xs font-medium">
                         {msg.avatar}
                     </Text>
@@ -374,11 +461,25 @@ export default function CommunityChat() {
                         contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24 }}
                         className="flex-1 bg-white"
                         onScrollToIndexFailed={(info) => {
-                            // Fallback if scroll to index fails
-                            setTimeout(() => {
-                                flatListRef.current?.scrollToEnd({ animated: true });
-                            }, 100);
+                            // Retry with delay to allow layout
+                            const wait = new Promise(resolve => setTimeout(resolve, 300));
+                            wait.then(() => {
+                                if (flatListRef.current && info.index < filteredMessages.length) {
+                                    flatListRef.current.scrollToIndex({
+                                        index: info.index,
+                                        animated: false
+                                    });
+                                }
+                            });
                         }}
+                        onContentSizeChange={() => {
+                            // Scroll to end when new messages arrive (after initial load)
+                            if (!isInitialLoadRef.current && messages.length > 0) {
+                                flatListRef.current?.scrollToEnd({ animated: true });
+                            }
+                        }}
+                        initialNumToRender={20}
+                        maxToRenderPerBatch={10}
                     />
 
                     {/* Input Bar - Now properly positioned with KeyboardAvoidingView */}

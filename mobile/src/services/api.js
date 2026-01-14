@@ -13,10 +13,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Direct WiFi)
-// const BASE_URL = 'http://192.168.18.131:5000/api';
-// AWS Direct HTTP - ACTIVE
-const BASE_URL = 'http://51.20.34.254:5000/api';
+// Local Network Dev (Direct WiFi) - DEV ONLY
+// export const BASE_URL = 'http://192.168.18.131:5000/api';
+// AWS Direct HTTP - PRODUCTION
+export const BASE_URL = 'http://51.20.34.254:5000/api';
 // Cloud Production (Any WiFi/4G)
 // const BASE_URL = 'https://urbanease-backend-suham.onrender.com/api';
 console.log('🌐 API BASE_URL:', BASE_URL);

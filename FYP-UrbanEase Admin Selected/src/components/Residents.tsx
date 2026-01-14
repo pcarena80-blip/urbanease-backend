@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, MoreVertical, CheckCircle, XCircle, AlertCircle, Check, X, Eye } from 'lucide-react';
+import { Plus, MoreVertical, CheckCircle, XCircle, AlertCircle, Check, X, Eye, Trash2, MessageCircleOff, MessageCircle } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 
@@ -18,6 +18,7 @@ interface User {
   floorNumber?: string;
   flatNumber?: string;
   isVerified: boolean;
+  isChatBlocked?: boolean;
 }
 
 export function Residents() {
@@ -60,6 +61,31 @@ export function Residents() {
     }
   };
 
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    if (!window.confirm(`Are you sure you want to delete ${userName}? This will also delete all their complaints, messages, and carpool listings. This action cannot be undone.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      setUsers(users.filter(user => user._id !== userId));
+      alert(`User ${userName} and all associated data have been deleted.`);
+    } catch (error: any) {
+      console.error("Failed to delete user", error);
+      alert(error.response?.data?.message || "Failed to delete user");
+    }
+  };
+
+  const handleToggleChatBlock = async (userId: string, currentlyBlocked: boolean) => {
+    try {
+      await api.put(`/admin/users/${userId}/chat-block`, { block: !currentlyBlocked });
+      setUsers(users.map(user => user._id === userId ? { ...user, isChatBlocked: !currentlyBlocked } : user));
+      alert(currentlyBlocked ? 'User can now send chat messages.' : 'User has been blocked from sending chat messages.');
+    } catch (error: any) {
+      console.error("Failed to toggle chat block", error);
+      alert(error.response?.data?.message || "Failed to update chat block status");
+    }
+  };
+
   const getStatus = (user: User) => {
     return user.isVerified ? 'active' : 'pending';
   };
@@ -91,20 +117,41 @@ export function Residents() {
   };
 
   const getActionButtons = (user: User) => {
-    if (!user.isVerified) {
-      return (
-        <div className="flex gap-2">
+    return (
+      <div className="flex gap-2 flex-wrap">
+        {!user.isVerified && (
           <button
             onClick={() => handleVerify(user._id)}
             className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
+            title="Verify User"
           >
             <Check className="w-4 h-4" />
             Verify
           </button>
-        </div>
-      );
-    }
-    return null;
+        )}
+        {user.isVerified && (
+          <button
+            onClick={() => handleToggleChatBlock(user._id, user.isChatBlocked || false)}
+            className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-sm ${user.isChatBlocked
+                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            title={user.isChatBlocked ? 'Unblock from Chat' : 'Block from Chat'}
+          >
+            {user.isChatBlocked ? <MessageCircle className="w-4 h-4" /> : <MessageCircleOff className="w-4 h-4" />}
+            {user.isChatBlocked ? 'Unblock Chat' : 'Block Chat'}
+          </button>
+        )}
+        <button
+          onClick={() => handleDeleteUser(user._id, user.name)}
+          className="flex items-center gap-1 px-3 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors text-sm"
+          title="Delete User"
+        >
+          <Trash2 className="w-4 h-4" />
+          Delete
+        </button>
+      </div>
+    );
   };
 
   if (error) {

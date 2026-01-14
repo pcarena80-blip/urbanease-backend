@@ -1,4 +1,4 @@
-import { Home, Users, CreditCard, AlertTriangle, Bell, MessageSquare, Settings } from 'lucide-react';
+import { Home, Users, CreditCard, AlertTriangle, Bell, MessageSquare, Settings, Car } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface SidebarProps {
@@ -8,11 +8,11 @@ interface SidebarProps {
 
 export function Sidebar({ activePage, setActivePage }: SidebarProps) {
   const { theme } = useTheme();
-  
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
     { id: 'residents', label: 'Residents', icon: Users },
-    { id: 'bills', label: 'Bills & Payments', icon: CreditCard },
+    { id: 'carpool', label: 'Carpooling', icon: Car }, // Replaced Bills
     { id: 'complaints', label: 'Complaints', icon: AlertTriangle },
     { id: 'announcements', label: 'E-Notice Board', icon: Bell },
     { id: 'chat', label: 'Chat Moderation', icon: MessageSquare },
@@ -34,13 +34,12 @@ export function Sidebar({ activePage, setActivePage }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => setActivePage(item.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
-                isActive
-                  ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white shadow-md'
-                  : theme === 'dark'
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${isActive
+                ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white shadow-md'
+                : theme === 'dark'
                   ? 'text-[#F2F2F2] hover:bg-[#2A2A2A]'
                   : 'text-gray-600 hover:bg-gray-100'
-              }`}
+                }`}
             >
               <div className={`p-2 rounded-lg ${isActive ? 'bg-white/20' : theme === 'dark' ? 'bg-[#2A2A2A]' : 'bg-green-50'}`}>
                 <Icon className={`w-5 h-5 ${isActive ? 'text-white' : theme === 'dark' ? 'text-white opacity-70' : 'text-[#00c878]'}`} />

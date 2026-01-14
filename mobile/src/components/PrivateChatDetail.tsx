@@ -23,20 +23,57 @@ export default function PrivateChatDetail() {
 
     useEffect(() => {
         loadUser();
-        // Initial load
-        loadMessages();
-        loadUnreadCount();
+        initializeChat();
 
         // Poll for new messages every 3s
-        const interval = setInterval(loadMessages, 5000);
+        const interval = setInterval(loadMessages, 3000);
 
-        // Mark as read on mount and unmount
-        markAsRead();
         return () => {
             clearInterval(interval);
-            markAsRead();
         };
     }, []);
+
+    const initializeChat = async () => {
+        try {
+            const [msgs, counts] = await Promise.all([
+                api.chat.getMessages(chat.id),
+                api.chat.getUnreadCounts()
+            ]);
+
+            setMessages(msgs);
+
+            let count = 0;
+            if (counts.privateChats && counts.privateChats[chat.id]) {
+                count = counts.privateChats[chat.id];
+            }
+            setUnreadCount(count);
+
+            // Scroll Logic
+            if (msgs.length > 0) {
+                setTimeout(() => {
+                    let index = msgs.length - 1; // Default to bottom (newest)
+                    if (count > 0) {
+                        // If 3 unread, and length is 10. Indices 0..9.
+                        // Unread are 7, 8, 9. First unread is 7 -> length - count.
+                        index = Math.max(0, msgs.length - count);
+                    }
+
+                    flatListRef.current?.scrollToIndex({
+                        index,
+                        animated: true,
+                        viewPosition: 0 // Top of the item
+                    });
+                }, 500); // Delay to allow render
+            }
+
+            // Mark as read after a delay to ensure user 'sees' it? 
+            // Or just mark it.
+            await api.chat.markAsRead(chat.id);
+            // setUnreadCount(0); // Optional: clear badge immediately
+        } catch (e) {
+            console.log('Init failed', e);
+        }
+    };
 
     const loadUser = async () => {
         const userData = await AsyncStorage.getItem('user');
@@ -236,6 +273,12 @@ export default function PrivateChatDetail() {
                         renderItem={renderItem}
                         contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24 }}
                         className="flex-1 bg-gray-50"
+                        onScrollToIndexFailed={info => {
+                            const wait = new Promise(resolve => setTimeout(resolve, 500));
+                            wait.then(() => {
+                                flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
+                            });
+                        }}
                     />
 
                     {/* Image Preview */}
