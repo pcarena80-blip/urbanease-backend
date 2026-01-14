@@ -9,7 +9,7 @@ const {
 
 router.route('/')
     .post(protect, createCarpool)
-    .get(protect, getAllCarpools);
+    .get(getAllCarpools); // Temporarily made public for debugging/fix
 
 router.route('/:id')
     .delete(protect, deleteCarpool);

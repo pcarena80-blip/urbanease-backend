@@ -95,6 +95,14 @@ const sendMessage = async (req, res) => {
     console.log('Body:', req.body);
     console.log('File:', req.file);
 
+    // Check if user is blocked from chat
+    const currentUser = await User.findById(req.user.id);
+    if (currentUser && currentUser.isChatBlocked) {
+        return res.status(403).json({
+            message: 'You are blocked from sending messages. Please contact the administrator.'
+        });
+    }
+
     const { receiverId, message } = req.body;
     const file = req.file;
 

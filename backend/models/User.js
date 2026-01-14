@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
     floorNumber: { type: String },
     flatNumber: { type: String },
     isVerified: { type: Boolean, default: false, index: true }, // Default unverified, verified after admin check
+    isChatBlocked: { type: Boolean, default: false }, // Admin can block user from sending chat messages
     lastCommunityRead: { type: Date, default: Date.now },
     registrationDate: { type: Date, default: Date.now },
     otp: { type: String },

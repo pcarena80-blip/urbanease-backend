@@ -5,6 +5,10 @@ const adminMiddleware = require('../middleware/adminMiddleware');
 const User = require('../models/User');
 const Complaint = require('../models/Complaint');
 const Bill = require('../models/Bill');
+const ChatMessage = require('../models/ChatMessage');
+const Carpool = require('../models/Carpool');
+const Notice = require('../models/Notice');
+const LoginHistory = require('../models/LoginHistory'); // ADDED: For graphs API
 
 // Get all users
 router.get('/users', protect, adminMiddleware, async (req, res) => {
@@ -45,18 +49,66 @@ router.put('/users/:id/verify', protect, adminMiddleware, async (req, res) => {
     }
 });
 
-// Delete user
+// Delete user (with cascade delete of related data)
 router.delete('/users/:id', protect, adminMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
-        if (user) {
-            await user.deleteOne();
-            console.log(`Admin deleted user: ${user.email}`);
-            res.json({ message: 'User removed' });
-        } else {
-            res.status(404).json({ message: 'User not found' });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
         }
+
+        const userId = user._id;
+
+        // Cascade delete all related data
+        const complaintsDeleted = await Complaint.deleteMany({ userId });
+        const messagesDeleted = await ChatMessage.deleteMany({
+            $or: [
+                { senderId: userId },
+                { receiverId: userId.toString() }
+            ]
+        });
+        const carpoolsDeleted = await Carpool.deleteMany({ provider: userId });
+        const billsDeleted = await Bill.deleteMany({ userId });
+
+        await user.deleteOne();
+
+        console.log(`Admin deleted user: ${user.email} (Complaints: ${complaintsDeleted.deletedCount}, Messages: ${messagesDeleted.deletedCount}, Carpools: ${carpoolsDeleted.deletedCount}, Bills: ${billsDeleted.deletedCount})`);
+
+        res.json({
+            message: 'User and all associated data removed',
+            deleted: {
+                complaints: complaintsDeleted.deletedCount,
+                messages: messagesDeleted.deletedCount,
+                carpools: carpoolsDeleted.deletedCount,
+                bills: billsDeleted.deletedCount
+            }
+        });
     } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Server error: ' + error.message });
+    }
+});
+
+// Toggle user chat block status
+router.put('/users/:id/chat-block', protect, adminMiddleware, async (req, res) => {
+    try {
+        const { block } = req.body;
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        user.isChatBlocked = block;
+        await user.save();
+
+        console.log(`Admin ${block ? 'blocked' : 'unblocked'} user from chat: ${user.email}`);
+
+        res.json({
+            message: block ? 'User blocked from chat' : 'User unblocked from chat',
+            isChatBlocked: user.isChatBlocked
+        });
+    } catch (error) {
+        console.error('Error toggling chat block:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -77,6 +129,11 @@ router.put('/complaints/:id/status', protect, adminMiddleware, async (req, res) 
         const { status } = req.body;
         const complaint = await Complaint.findById(req.params.id);
         if (complaint) {
+            // Lifecycle validation: prevent invalid status transitions
+            if ((complaint.status === 'resolved' || complaint.status === 'rejected') && status === 'cancelled') {
+                return res.status(400).json({ message: 'Cannot cancel a resolved or rejected complaint' });
+            }
+
             complaint.status = status;
             if (status === 'resolved') {
                 complaint.response = 'Resolved by Admin';
@@ -99,8 +156,6 @@ router.put('/complaints/:id/status', protect, adminMiddleware, async (req, res) 
         res.status(500).json({ message: 'Server error' });
     }
 });
-
-const Notice = require('../models/Notice');
 
 // Get all bills
 router.get('/bills', protect, adminMiddleware, async (req, res) => {
@@ -252,30 +307,21 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
         const activeComplaints = await Complaint.countDocuments({ status: 'in-progress' });
         const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
 
-        // Bill Stats
-        const billsDue = await Bill.aggregate([
-            { $match: { status: 'unpaid' } },
-            { $group: { _id: null, total: { $sum: "$amount" } } }
-        ]);
-        const totalBillsDue = billsDue.length > 0 ? billsDue[0].total : 0;
-        const unpaidBillsCount = await Bill.countDocuments({ status: 'unpaid' });
+        // Noise Complaints (active only - pending or in-progress)
+        const noiseComplaints = await Complaint.countDocuments({
+            category: { $in: ['Noise', 'Noise Complaint'] },
+            status: { $in: ['pending', 'in-progress'] }
+        });
 
         // Notice Stats
         const activeNotices = await Notice.countDocuments({ expiryDate: { $gte: new Date() } });
-
-        // Complaint Resolution Data (Dummy logic for graph for now, or aggregate by createdAt)
-        // For simplicity, we'll return static graph data but real counts
-        // To do real graph: would need aggregation of changes or creation dates. 
-        // Let's rely on frontend for graph (or keep static graph until complex aggregation is needed).
-        // For now, let's send what we have.
 
         res.json({
             totalResidents,
             activeResidents,
             activeComplaints,
             pendingComplaints,
-            totalBillsDue,
-            unpaidBillsCount,
+            noiseComplaints,
             activeNotices
         });
 
@@ -285,22 +331,147 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
     }
 });
 
+// Get Dashboard Graph Data (Real-time aggregation)
+router.get('/stats/graphs', protect, adminMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+
+        // --- Activity Data (Last 24 Hours by 4-hour intervals) ---
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+
+        const activityPipeline = [
+            { $match: { loginTime: { $gte: twentyFourHoursAgo } } },
+            {
+                $group: {
+                    _id: {
+                        interval: {
+                            $multiply: [{ $floor: { $divide: [{ $hour: '$loginTime' }, 4] } }, 4]
+                        }
+                    },
+                    logins: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id.interval': 1 } }
+        ];
+
+        const loginAggregation = await LoginHistory.aggregate(activityPipeline);
+        console.log('[DEBUG] Login Aggregation result:', JSON.stringify(loginAggregation));
+
+        // Complaints created in last 24 hours by interval
+        const complaintActivityPipeline = [
+            { $match: { createdAt: { $gte: twentyFourHoursAgo } } },
+            {
+                $group: {
+                    _id: {
+                        interval: {
+                            $multiply: [{ $floor: { $divide: [{ $hour: '$createdAt' }, 4] } }, 4]
+                        }
+                    },
+                    complaints: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id.interval': 1 } }
+        ];
+
+        const complaintActivity = await Complaint.aggregate(complaintActivityPipeline);
+        console.log('[DEBUG] Complaint Aggregation result:', JSON.stringify(complaintActivity));
+
+        // Build activity data for chart (6 intervals: 0, 4, 8, 12, 16, 20)
+        const timeLabels = ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'];
+        const activityData = timeLabels.map((time, idx) => {
+            const intervalHour = idx * 4;
+            const loginData = loginAggregation.find(l => l._id.interval === intervalHour);
+            const complaintData = complaintActivity.find(c => c._id.interval === intervalHour);
+            return {
+                time,
+                logins: loginData ? loginData.logins : 0,
+                complaints: complaintData ? complaintData.complaints : 0,
+                activity: (loginData ? loginData.logins : 0) + (complaintData ? complaintData.complaints : 0) * 2
+            };
+        });
+
+        // --- Resolution Data (Last 7 Days) ---
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+        const resolutionPipeline = [
+            { $match: { createdAt: { $gte: sevenDaysAgo } } },
+            {
+                $group: {
+                    _id: {
+                        dayOfWeek: { $dayOfWeek: '$createdAt' },
+                        status: '$status'
+                    },
+                    count: { $sum: 1 }
+                }
+            }
+        ];
+
+        const resolutionAggregation = await Complaint.aggregate(resolutionPipeline);
+
+        // Day mapping (MongoDB: 1=Sunday, 2=Monday, etc.)
+        const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const resolutionData = dayNames.map((day, idx) => {
+            const dayOfWeek = idx + 1;
+            const resolved = resolutionAggregation.find(r => r._id.dayOfWeek === dayOfWeek && r._id.status === 'resolved');
+            const pending = resolutionAggregation.find(r => r._id.dayOfWeek === dayOfWeek && r._id.status === 'pending');
+            const inProgress = resolutionAggregation.find(r => r._id.dayOfWeek === dayOfWeek && r._id.status === 'in-progress');
+            return {
+                day,
+                resolved: resolved ? resolved.count : 0,
+                pending: (pending ? pending.count : 0) + (inProgress ? inProgress.count : 0)
+            };
+        });
+
+        res.json({
+            activityData,
+            resolutionData
+        });
+
+    } catch (error) {
+        console.error('Graph aggregation error:', error);
+        res.status(500).json({ message: 'Server error fetching graph data' });
+    }
+});
+
 // NOTICE ROUTES
 
-// Get all notices
+// Get all ACTIVE notices (not expired)
 router.get('/notices', protect, adminMiddleware, async (req, res) => {
     try {
-        const notices = await Notice.find().sort({ createdAt: -1 });
+        const now = new Date();
+        const notices = await Notice.find({ expiryDate: { $gte: now } }).sort({ createdAt: -1 });
         res.json(notices);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
     }
 });
 
-// Create notice
+// Get EXPIRED notices (History)
+router.get('/notices/history', protect, adminMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const expiredNotices = await Notice.find({ expiryDate: { $lt: now } }).sort({ expiryDate: -1 });
+        res.json(expiredNotices);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Create notice (with expiry validation)
 router.post('/notices', protect, adminMiddleware, async (req, res) => {
     try {
         const { title, description, expiryDate } = req.body;
+
+        // Validate expiry date is not in the past
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const expiry = new Date(expiryDate);
+        expiry.setHours(0, 0, 0, 0);
+
+        if (expiry < today) {
+            return res.status(400).json({ message: 'Expiry date cannot be in the past' });
+        }
+
         const notice = await Notice.create({
             title,
             description,

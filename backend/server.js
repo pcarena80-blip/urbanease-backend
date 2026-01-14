@@ -12,14 +12,34 @@ const compression = require('compression');
 // Initialize Express
 const app = express();
 
-// Middleware
-app.use(compression()); // Compress all responses
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Performance: Disable x-powered-by header
+app.disable('x-powered-by');
 
-// Serve static files (uploads)
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), { maxAge: '1d' })); // Cache static files
+// Middleware
+app.use(compression({ level: 6, threshold: 1024 })); // Compress responses > 1KB
+app.use(cors({
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    optionsSuccessStatus: 200 // For legacy browser support
+}));
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+// Performance: Cache-Control headers for API responses
+app.use((req, res, next) => {
+    // Cache GET requests for 30 seconds (stale-while-revalidate for 60s)
+    if (req.method === 'GET') {
+        res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    }
+    next();
+});
+
+// Serve static files (uploads) with aggressive caching
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+    maxAge: '7d',
+    etag: true,
+    lastModified: true
+}));
 
 // Connect to MongoDB
 const connectDB = async () => {

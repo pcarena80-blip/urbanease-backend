@@ -18,7 +18,11 @@ const carpoolSchema = new mongoose.Schema({
     vehicleType: {
         type: String,
         required: true,
-        enum: ['Car', 'Bike', 'Van', 'Other']
+        enum: ['Car', 'Jeep', 'SUV']
+    },
+    vehicleName: {
+        type: String,
+        required: true
     },
     vehicleNumber: {
         type: String,
@@ -26,24 +30,37 @@ const carpoolSchema = new mongoose.Schema({
     },
     seatingCapacity: {
         type: Number,
-        required: true
+        required: true,
+        max: 4 // Enforce max 4 seats
     },
     seatsAvailable: {
         type: Number,
-        required: true
+        required: true,
+        max: 4
     },
-    availableDays: {
-        type: [String], // ['Mon', 'Tue', ...]
-        required: true
-    },
-    timeSlot: {
+    // Trip type: one-way (going only) or two-way (going and returning)
+    tripType: {
         type: String,
-        required: true // e.g., "Morning", "Evening", or "08:00 AM"
+        enum: ['one-way', 'two-way'],
+        required: true,
+        default: 'two-way'
+    },
+    // Schedule with going times, return times optional for one-way trips
+    schedule: {
+        type: [{
+            day: { type: String, required: true },
+            goingTime: { type: String, required: true },
+            goingPeriod: { type: String, enum: ['AM', 'PM'], required: true },
+            // Return times are optional (only used for two-way trips)
+            returnTime: { type: String, required: false },
+            returnPeriod: { type: String, enum: ['AM', 'PM'], required: false }
+        }],
+        required: true
     },
     pickupLocation: {
         type: String,
         required: true,
-        default: 'ABC Residency – Main Gate' // Fixed as per requirements
+        default: 'Urban E Society' // Fixed departure location
     },
     destination: {
         type: String,
@@ -51,8 +68,12 @@ const carpoolSchema = new mongoose.Schema({
     },
     createdAt: {
         type: Date,
-        default: Date.now
+        default: Date.now,
+        index: true
     }
 });
+
+// Index for faster sorting
+carpoolSchema.index({ createdAt: -1 });
 
 module.exports = mongoose.model('Carpool', carpoolSchema);

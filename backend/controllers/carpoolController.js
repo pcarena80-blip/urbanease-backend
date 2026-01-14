@@ -9,38 +9,42 @@ const createCarpool = async (req, res) => {
         const {
             contactNumber,
             vehicleType,
+            vehicleName,
             vehicleNumber,
             seatingCapacity,
             seatsAvailable,
-            availableDays,
-            timeSlot,
-            destination
+            schedule,
+            pickupLocation,
+            destination,
+            tripType
         } = req.body;
 
-        // Ensure user is verified (basic safety)
+        console.log('[DEBUG] Create Carpool Request Body:', JSON.stringify(req.body));
+
         const user = await User.findById(req.user.id);
-        if (!user || user.role !== 'user' /* Add isVerified check if strictly required, simplified for now */) {
-            // Proceeding assuming 'user' is enough, but strictly "residents only" implies authenticated
+
+        if (seatingCapacity > 4) {
+            return res.status(400).json({ message: 'Seating capacity cannot exceed 4' });
+        }
+        if (seatsAvailable > seatingCapacity) {
+            return res.status(400).json({ message: 'Available seats cannot exceed capacity' });
         }
 
-        // Check if user already has a listing? Optional. Let's allow one per user for simplicity.
-        const existing = await Carpool.findOne({ provider: req.user.id });
-        if (existing) {
-            return res.status(400).json({ message: 'You already have an active carpool listing' });
-        }
+        // Multiple carpools per user now allowed
 
         const carpool = await Carpool.create({
             provider: req.user.id,
             name: user.name,
             contactNumber,
             vehicleType,
+            vehicleName,
             vehicleNumber,
             seatingCapacity,
             seatsAvailable,
-            availableDays,
-            timeSlot,
-            pickupLocation: "ABC Residency – Main Gate", // Enforce fixed location
-            destination
+            schedule,
+            pickupLocation,
+            destination,
+            tripType // Add tripType to creation
         });
 
         res.status(201).json(carpool);
@@ -55,7 +59,9 @@ const createCarpool = async (req, res) => {
 // @access  Private
 const getAllCarpools = async (req, res) => {
     try {
+        console.log('[DEBUG] getAllCarpools request received');
         const carpools = await Carpool.find().sort({ createdAt: -1 });
+        console.log(`[DEBUG] Found ${carpools.length} carpools`);
         res.json(carpools);
     } catch (error) {
         console.error("Get Carpools Error:", error);
@@ -74,7 +80,6 @@ const deleteCarpool = async (req, res) => {
             return res.status(404).json({ message: 'Carpool listing not found' });
         }
 
-        // Ensure user owns the listing
         if (carpool.provider.toString() !== req.user.id) {
             return res.status(401).json({ message: 'Not authorized to delete this listing' });
         }

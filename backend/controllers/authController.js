@@ -50,7 +50,7 @@ const sendRegistrationOtp = async (req, res) => {
         }
 
         const otp = generateOTP();
-        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 mins
+        const expiresAt = Date.now() + 1 * 60 * 1000; // 1 minute only
 
         // Update or create OTP record
         await RegistrationOtp.findOneAndUpdate(
@@ -62,7 +62,7 @@ const sendRegistrationOtp = async (req, res) => {
         const message = `
             <h1>Registration OTP</h1>
             <p>Your OTP for UrbanEase registration is: <h2>${otp}</h2></p>
-            <p>This code expires in 10 minutes.</p>
+            <p>This code expires in 1 minute.</p>
         `;
 
         const emailSent = await sendEmail({
@@ -181,7 +181,7 @@ const registerUser = async (req, res) => {
             floorNumber: req.body.floorNumber,
             flatNumber: req.body.flatNumber,
             role: 'user',
-            isVerified: true // Auto-verify so they appear in Bills section immediately
+            isVerified: false // Wait for admin approval
         });
 
         // Cleanup OTP record
@@ -212,6 +212,13 @@ const loginUser = async (req, res) => {
     const user = await User.findOne({ email });
 
     if (user && (await bcrypt.compare(password, user.password))) {
+        // Check if user is verified by admin
+        if (!user.isVerified) {
+            return res.status(403).json({
+                message: 'Account pending verification. Please wait for admin approval before logging in.'
+            });
+        }
+
         await LoginHistory.create({ userId: user.id });
         res.json({
             _id: user.id,
