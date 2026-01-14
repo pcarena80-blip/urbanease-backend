@@ -18,7 +18,7 @@ const mongoose = require('mongoose');
 const User = require('../models/User');
 const Complaint = require('../models/Complaint');
 const ChatMessage = require('../models/ChatMessage');
-const Carpool = require('../models/Carpool');
+const Carpool = require('../models/CarpoolModel');
 
 const USERS_TO_DELETE = [
     'Umar Masood',

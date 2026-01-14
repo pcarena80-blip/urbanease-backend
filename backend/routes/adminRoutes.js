@@ -6,7 +6,7 @@ const User = require('../models/User');
 const Complaint = require('../models/Complaint');
 const Bill = require('../models/Bill');
 const ChatMessage = require('../models/ChatMessage');
-const Carpool = require('../models/Carpool');
+const Carpool = require('../models/CarpoolModel');
 const Notice = require('../models/Notice');
 const LoginHistory = require('../models/LoginHistory'); // ADDED: For graphs API
 

@@ -1,4 +1,4 @@
-const Carpool = require('../models/Carpool');
+const Carpool = require('../models/CarpoolModel');
 const User = require('../models/User');
 
 // @desc    Create a new carpool listing
