@@ -50,7 +50,8 @@ const createCarpool = async (req, res) => {
         res.status(201).json(carpool);
     } catch (error) {
         console.error("Create Carpool Error:", error);
-        res.status(500).json({ message: 'Server error creating carpool listing' });
+        // RETURN REAL ERROR FOR DEBUGGING
+        res.status(500).json({ message: error.message, stack: error.stack });
     }
 };
 
