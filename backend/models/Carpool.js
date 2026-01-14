@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 // Schema Force Update v2
 
+console.log("=== LOADING CARPOOL MODEL V3 (DEBUG) ===");
 const carpoolSchema = new mongoose.Schema({
     provider: {
         type: mongoose.Schema.Types.ObjectId,
