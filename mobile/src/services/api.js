@@ -13,7 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Direct WiFi) - DEV ONLY
+// Local Network Dev (Direct WiFi) - DEV ONLY (Use this when running backend locally)
 // export const BASE_URL = 'http://192.168.18.131:5000/api';
 // AWS Direct HTTP - PRODUCTION
 export const BASE_URL = 'http://51.20.34.254:5000/api';
@@ -215,26 +215,23 @@ export const api = {
         },
         sendMessage: async (messageData) => {
             const headers = await getHeaders();
-            let body = messageData;
+
+            // If FormData (for file uploads), remove Content-Type to let browser set it with boundary
             if (messageData instanceof FormData) {
                 delete headers['Content-Type'];
-                body = messageData;
-            } else if (!(messageData instanceof FormData)) {
-                // If simple object convert to body? No, request handles json stringify?
-                // request helper expects body to be string or FormData?
-                // request helper just passes body.
-                if (!(messageData instanceof FormData)) {
-                    body = JSON.stringify(messageData);
-                }
+                return request('/chat', {
+                    method: 'POST',
+                    headers: headers,
+                    body: messageData
+                });
+            } else {
+                // Regular JSON message
+                return request('/chat', {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(messageData)
+                });
             }
-            // fix logic above:
-            // The original logic checked instanceof FormData.
-
-            return request('/chat', {
-                method: 'POST',
-                headers: headers,
-                body: body
-            });
         },
         deleteMessage: async (messageId) => {
             return request(`/chat/${messageId}`, {
@@ -276,12 +273,14 @@ export const api = {
     getImageUrl: (path) => {
         if (!path) return null;
         if (path.startsWith('http')) return path;
-        // Clean path to ensure no double slashes if path starts with /
-        const cleanPath = path.startsWith('/') ? path.substring(1) : path;
-        // This base URL should match where your static files are served from
-        // For render, it might be the same as BASE_URL's root.
-        // If BASE_URL is .../api, we want the root.
-        const rootUrl = BASE_URL.replace('/api', '');
-        return `${rootUrl}/${cleanPath}`;
+
+        // Remove backslashes if any (Windows path fix)
+        const cleanPath = path.replace(/\\/g, '/');
+        const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
+
+        // Get root URL from BASE_URL (remove /api)
+        const rootUrl = BASE_URL.replace(/\/api\/?$/, '');
+
+        return `${rootUrl}/${normalizedPath}`;
     }
 };

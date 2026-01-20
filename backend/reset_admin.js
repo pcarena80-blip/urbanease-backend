@@ -5,48 +5,47 @@ const User = require('./models/User');
 
 dotenv.config();
 
-// Define Admin Credentials
-const ADMIN_EMAIL = 'admin@urbanease.com';
-const ADMIN_PASS = 'pakistan123';
-
 const resetAdmin = async () => {
     try {
-        await mongoose.connect(process.env.MONGO_URI);
-        console.log('MongoDB Connected');
+        await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/urbanease');
+        console.log('Connected to DB');
 
-        // 1. Check if Admin Exists
-        const admin = await User.findOne({ email: ADMIN_EMAIL });
+        const email = 'admin@urbanease.com';
+        const password = 'pakistan123';
 
-        // 2. Hash Password
         const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(ADMIN_PASS, salt);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Try to update existing admin
+        let admin = await User.findOne({ email });
 
         if (admin) {
-            console.log('Found existing Admin. Updating password...');
+            console.log('Admin user found. Updating password...');
             admin.password = hashedPassword;
-            admin.role = 'superadmin'; // Ensure role is correct
+            admin.role = 'admin'; // Ensure role is correct
             admin.isVerified = true;
             await admin.save();
-            console.log('✅ Admin Password Updated Successfully!');
+            console.log('Admin password updated successfully.');
         } else {
-            console.log('Admin not found. Creating new Super Admin...');
-            await User.create({
+            console.log('Admin user NOT found. Creating new admin...');
+            admin = await User.create({
                 name: 'Super Admin',
-                email: ADMIN_EMAIL,
-                phone: '03001234567',
+                email: email,
                 password: hashedPassword,
-                role: 'superadmin',
+                role: 'admin',
                 isVerified: true,
-                propertyType: 'house' // Default
+                phone: '0000000000',
+                // Add dummy required fields if schema needs them
+                block: 'A',
+                street: '1',
+                houseNo: '1'
             });
-            console.log('✅ Admin Account Created Successfully!');
+            console.log('New Admin user created.');
         }
 
-        console.log(`\n👉 Login with:\nEmail: ${ADMIN_EMAIL}\nPassword: ${ADMIN_PASS}\n`);
-        process.exit();
-
+        process.exit(0);
     } catch (error) {
-        console.error('❌ Error:', error.message);
+        console.error('Error resetting admin:', error);
         process.exit(1);
     }
 };

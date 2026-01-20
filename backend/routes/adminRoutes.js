@@ -326,8 +326,16 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
         });
 
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error fetching stats' });
+        console.error('Stats fetch error:', error);
+        // Return default "zero" stats instead of crashing the dashboard
+        res.json({
+            totalResidents: 0,
+            activeResidents: 0,
+            activeComplaints: 0,
+            pendingComplaints: 0,
+            noiseComplaints: 0,
+            activeNotices: 0
+        });
     }
 });
 
@@ -429,7 +437,11 @@ router.get('/stats/graphs', protect, adminMiddleware, async (req, res) => {
 
     } catch (error) {
         console.error('Graph aggregation error:', error);
-        res.status(500).json({ message: 'Server error fetching graph data' });
+        // Return clear empty structure instead of crashing
+        res.json({
+            activityData: [],
+            resolutionData: []
+        });
     }
 });
 
@@ -440,8 +452,30 @@ router.get('/notices', protect, adminMiddleware, async (req, res) => {
     try {
         const now = new Date();
         const notices = await Notice.find({ expiryDate: { $gte: now } }).sort({ createdAt: -1 });
+        console.log(`[GET] Returning ${notices.length} notices. IDs:`, notices.map(n => n.id));
         res.json(notices);
     } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// ... (skipping history route)
+
+// Delete notice
+router.delete('/notices/:id', protect, adminMiddleware, async (req, res) => {
+    try {
+        console.log('[DELETE] Attempting to delete notice:', req.params.id);
+        const notice = await Notice.findByIdAndDelete(req.params.id);
+
+        if (notice) {
+            console.log('[DELETE] Notice deleted successfully');
+            res.json({ message: 'Notice removed' });
+        } else {
+            console.log('[DELETE] Notice not found in DB');
+            res.status(404).json({ message: 'Notice not found in database. Please refresh.' });
+        }
+    } catch (error) {
+        console.error('[DELETE] Error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
@@ -458,8 +492,12 @@ router.get('/notices/history', protect, adminMiddleware, async (req, res) => {
 });
 
 // Create notice (with expiry validation)
-router.post('/notices', protect, adminMiddleware, async (req, res) => {
+// Replace POST /notices logic
+// Create notice (with expiry validation)
+// Replace POST /notices logic
+router.post('/notices', protect, adminMiddleware, require('../middleware/uploadMiddleware').single('file'), async (req, res) => {
     try {
+        console.log('[CREATE] Attempting to create notice:', req.body);
         const { title, description, expiryDate } = req.body;
 
         // Validate expiry date is not in the past
@@ -472,11 +510,20 @@ router.post('/notices', protect, adminMiddleware, async (req, res) => {
             return res.status(400).json({ message: 'Expiry date cannot be in the past' });
         }
 
-        const notice = await Notice.create({
+        const noticeData = {
             title,
             description,
             expiryDate
-        });
+        };
+
+        if (req.file) {
+            // Store the relative path (uploads/filename)
+            // req.file.path gives absolute path, so we use req.file.filename and prepend directory
+            noticeData.attachment = 'uploads/' + req.file.filename;
+            console.log('Saving notice attachment:', noticeData.attachment);
+        }
+
+        const notice = await Notice.create(noticeData);
 
         // Notify users via Socket.IO
         if (req.io) {
@@ -489,20 +536,7 @@ router.post('/notices', protect, adminMiddleware, async (req, res) => {
     }
 });
 
-// Delete notice
-router.delete('/notices/:id', protect, adminMiddleware, async (req, res) => {
-    try {
-        const notice = await Notice.findById(req.params.id);
-        if (notice) {
-            await notice.deleteOne();
-            res.json({ message: 'Notice removed' });
-        } else {
-            res.status(404).json({ message: 'Notice not found' });
-        }
-    } catch (error) {
-        res.status(500).json({ message: 'Server error' });
-    }
-});
+
 
 // SUPER ADMIN ROUTES: Admin Management
 

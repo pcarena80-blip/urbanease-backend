@@ -5,6 +5,7 @@ const User = require('../models/User');
 // @route   POST /api/carpool
 // @access  Private (Resident only)
 const createCarpool = async (req, res) => {
+    console.log('[CARPOOL] Create request received'); // Log entry
     try {
         const {
             contactNumber,
@@ -21,8 +22,19 @@ const createCarpool = async (req, res) => {
 
         console.log('[DEBUG] Create Carpool Request Body:', JSON.stringify(req.body));
 
-        const user = await User.findById(req.user.id);
+        // 1. Validate User
+        if (!req.user || !req.user.id) {
+            console.error('[CARPOOL ERROR] User ID missing in request');
+            return res.status(401).json({ message: 'User not authenticated' });
+        }
 
+        const user = await User.findById(req.user.id);
+        if (!user) {
+            console.error(`[CARPOOL ERROR] User not found for ID: ${req.user.id}`);
+            return res.status(404).json({ message: 'User profile not found' });
+        }
+
+        // 2. Validate Data
         if (seatingCapacity > 4) {
             return res.status(400).json({ message: 'Seating capacity cannot exceed 4' });
         }
@@ -30,7 +42,8 @@ const createCarpool = async (req, res) => {
             return res.status(400).json({ message: 'Available seats cannot exceed capacity' });
         }
 
-        // Multiple carpools per user now allowed
+        // 3. Create Entry
+        console.log(`[CARPOOL] Creating listing for user: ${user.name} (${user._id})`);
 
         const carpool = await Carpool.create({
             provider: req.user.id,
@@ -44,14 +57,20 @@ const createCarpool = async (req, res) => {
             schedule,
             pickupLocation,
             destination,
-            tripType // Add tripType to creation
+            tripType
         });
 
+        console.log(`[CARPOOL] Created successfully: ${carpool._id}`);
         res.status(201).json(carpool);
+
     } catch (error) {
-        console.error("Create Carpool Error:", error);
-        // RETURN REAL ERROR FOR DEBUGGING
-        res.status(500).json({ message: error.message, stack: error.stack });
+        console.error("Create Carpool CRITICAL Error:", error);
+        // Return DETAILED error to client even in production for this specific endpoint
+        // to help debug the P0 incident.
+        res.status(500).json({
+            message: `Server Error: ${error.message}`,
+            details: error.toString()
+        });
     }
 };
 
@@ -61,7 +80,9 @@ const createCarpool = async (req, res) => {
 const getAllCarpools = async (req, res) => {
     try {
         console.log('[DEBUG] getAllCarpools request received');
-        const carpools = await Carpool.find().sort({ createdAt: -1 });
+        const carpools = await Carpool.find()
+            .populate('reports.reportedBy', 'name email')
+            .sort({ createdAt: -1 });
         console.log(`[DEBUG] Found ${carpools.length} carpools`);
         res.json(carpools);
     } catch (error) {
@@ -93,8 +114,61 @@ const deleteCarpool = async (req, res) => {
     }
 };
 
+// @desc    Block/Delete carpool listing (Admin only)
+// @route   DELETE /api/carpool/:id/block
+// @access  Private (Admin)
+const blockCarpool = async (req, res) => {
+    try {
+        const carpool = await Carpool.findById(req.params.id);
+
+        if (!carpool) {
+            return res.status(404).json({ message: 'Carpool listing not found' });
+        }
+
+        // Admin override - no ownership check needed
+        await carpool.deleteOne();
+        res.json({ message: 'Carpool listing blocked/removed by admin' });
+    } catch (error) {
+        console.error("Block Carpool Error:", error);
+        res.status(500).json({ message: 'Server error blocking carpool listing' });
+    }
+};
+
+// @desc    Report a carpool listing
+// @route   POST /api/carpool/:id/report
+// @access  Private
+const reportCarpool = async (req, res) => {
+    try {
+        const { reason } = req.body;
+        const carpool = await Carpool.findById(req.params.id);
+
+        if (!carpool) {
+            return res.status(404).json({ message: 'Carpool listing not found' });
+        }
+
+        // Prevent double reporting?
+        const alreadyReported = carpool.reports.find(r => r.reportedBy.toString() === req.user.id);
+        if (alreadyReported) {
+            return res.status(400).json({ message: 'You have already reported this listing' });
+        }
+
+        carpool.reports.push({
+            reportedBy: req.user.id,
+            reason
+        });
+
+        await carpool.save();
+        res.json({ message: 'Report submitted successfully' });
+    } catch (error) {
+        console.error("Report Carpool Error:", error);
+        res.status(500).json({ message: 'Server error reporting carpool' });
+    }
+};
+
 module.exports = {
     createCarpool,
     getAllCarpools,
-    deleteCarpool
+    deleteCarpool,
+    blockCarpool,
+    reportCarpool
 };

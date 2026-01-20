@@ -229,8 +229,8 @@ export default function CarpoolFormScreen() {
                 <Text className="text-xl font-bold text-gray-900">Offer Carpool</Text>
             </View>
 
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1">
-                <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 40 }}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} className="flex-1" keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+                <ScrollView className="flex-1 p-4" contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
 
                     {/* Contact Info */}
                     <View className="bg-white p-4 rounded-2xl mb-4 shadow-sm border border-gray-100">
@@ -498,7 +498,7 @@ export default function CarpoolFormScreen() {
                 </ScrollView>
 
                 {/* Fixed Submit Button - Always visible above keyboard */}
-                <View className="px-4 pb-6 pt-2 bg-gray-50 border-t border-gray-200">
+                <View className="px-4 pb-24 pt-2 bg-gray-50 border-t border-gray-200">
                     <TouchableOpacity
                         onPress={handleSubmit}
                         disabled={isSubmitting}

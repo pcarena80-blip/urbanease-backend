@@ -1,7 +1,8 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { ArrowLeft, Calendar } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { api } from '../services/api';
 
 export default function NoticeDetails() {
   const navigation = useNavigation<any>();
@@ -66,37 +67,19 @@ export default function NoticeDetails() {
               {notice.description}
             </Text>
 
-            {notice.title === 'Urgent: Water Supply Maintenance' && (
-              <Text className="text-gray-700 text-[15px] leading-relaxed">
-                We apologize for any inconvenience this may cause. Please make necessary arrangements to store water in advance. Emergency water tankers will be available on standby if needed.
-                {'\n\n'}
-                For any queries, please contact the maintenance office.
-                {'\n\n'}
-                Thank you for your cooperation.
-                {'\n'}
-                - Management Team
-              </Text>
+            {notice.attachment && (
+              <View className="mb-4 rounded-xl overflow-hidden bg-gray-100">
+                <Image
+                  source={{ uri: api.getImageUrl(notice.attachment) }}
+                  style={{ width: '100%', height: 200 }}
+                  resizeMode="cover"
+                />
+              </View>
             )}
 
-            {notice.title === 'Community Meeting This Friday' && (
-              <Text className="text-gray-700 text-[15px] leading-relaxed">
-                The meeting will be held at 6:00 PM at the main clubhouse. Topics include upcoming maintenance projects, security updates, and community event planning.
-                {'\n\n'}
-                Your presence and participation are highly valued.
-                {'\n\n'}
-                - Community Committee
-              </Text>
-            )}
-
-            {!notice.title.includes('Water Supply') && !notice.title.includes('Community Meeting') && (
-              <Text className="text-gray-700 text-[15px] leading-relaxed">
-                Additional details about this notice will be shared soon. Please stay tuned for further updates.
-                {'\n\n'}
-                For more information, please contact the administration office during working hours.
-                {'\n\n'}
-                - Administration
-              </Text>
-            )}
+            <Text className="text-gray-500 text-xs italic mt-2">
+              - Management Team
+            </Text>
           </View>
         </View>
       </ScrollView>

@@ -13,6 +13,10 @@ const noticeSchema = mongoose.Schema({
         type: Date,
         required: true,
     },
+    attachment: {
+        type: String, // URL to image/file
+        required: false
+    },
 }, {
     timestamps: true
 });

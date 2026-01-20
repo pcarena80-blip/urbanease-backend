@@ -187,20 +187,7 @@ export default function SignupScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [modal, setModal] = useState({ visible: false, type: 'success' as 'success' | 'error', title: '', message: '' });
 
-  // Start OTP countdown timer (60 seconds)
-  const startOtpCountdown = () => {
-    setOtpCountdown(60);
-    if (countdownRef.current) clearInterval(countdownRef.current);
-    countdownRef.current = setInterval(() => {
-      setOtpCountdown(prev => {
-        if (prev <= 1) {
-          if (countdownRef.current) clearInterval(countdownRef.current);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-  };
+
 
   // Cleanup countdown on unmount
   useEffect(() => {
@@ -285,8 +272,8 @@ export default function SignupScreen() {
       Alert.alert('Error', 'Enter valid 6-digit OTP');
       return;
     }
-    if (otpCountdown === 0) {
-      Alert.alert('Error', 'OTP has expired. Please request a new one.');
+    if (timer === 0) {
+      Alert.alert('Error', 'OTP has expired. Please tap Resend to get a new code.');
       return;
     }
     setOtpLoading(true);
@@ -445,11 +432,21 @@ export default function SignupScreen() {
                   <View className="mt-3 bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <View className="flex-row items-center justify-between mb-3 bg-white p-2 rounded-lg border border-gray-100">
                       <Text className="text-gray-600 text-xs ml-1">Sent to {formData.email}</Text>
-                      <View className={`px-2 py-1 rounded-md ${timer > 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-                        <Text className={`text-xs font-bold ${timer > 0 ? 'text-[#027A4C]' : 'text-red-500'}`}>
-                          {timer > 0 ? `${timer}s` : 'Expired'}
-                        </Text>
-                      </View>
+                      {timer > 0 ? (
+                        <View className="px-2 py-1 rounded-md bg-green-50">
+                          <Text className="text-xs font-bold text-[#027A4C]">{timer}s</Text>
+                        </View>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() => {
+                            setOtp('');
+                            handleSendOtp();
+                          }}
+                          className="px-3 py-1.5 rounded-md bg-[#027A4C]"
+                        >
+                          <Text className="text-xs font-bold text-white">Resend</Text>
+                        </TouchableOpacity>
+                      )}
                     </View>
                     <TextInput
                       value={otp}
@@ -457,21 +454,22 @@ export default function SignupScreen() {
                       placeholder="123456"
                       keyboardType="number-pad"
                       maxLength={6}
-                      className="bg-white border border-gray-300 rounded-lg p-3 text-center text-lg font-bold tracking-[5px] mb-3 text-gray-800"
+                      editable={timer > 0}
+                      className={`bg-white border border-gray-300 rounded-lg p-3 text-center text-lg font-bold tracking-[5px] mb-3 ${timer > 0 ? 'text-gray-800' : 'text-gray-400 bg-gray-100'}`}
                     />
                     <View className="flex-row gap-3">
                       <TouchableOpacity
-                        onPress={() => { setIsOtpSent(false); setOtp(''); }}
+                        onPress={() => { setIsOtpSent(false); setOtp(''); setTimer(60); }}
                         className="flex-1 py-3 bg-gray-200 rounded-lg items-center"
                       >
                         <Text className="text-gray-600 font-medium text-xs">Change Email</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleVerifyOtp}
-                        disabled={otpLoading}
-                        className="flex-1 py-3 bg-[#027A4C] rounded-lg items-center"
+                        disabled={otpLoading || timer === 0}
+                        className={`flex-1 py-3 rounded-lg items-center ${timer > 0 ? 'bg-[#027A4C]' : 'bg-gray-300'}`}
                       >
-                        {otpLoading ? <ActivityIndicator color="white" size="small" /> : <Text className="text-white font-bold text-xs">Submit OTP</Text>}
+                        {otpLoading ? <ActivityIndicator color="white" size="small" /> : <Text className={`font-bold text-xs ${timer > 0 ? 'text-white' : 'text-gray-500'}`}>Submit OTP</Text>}
                       </TouchableOpacity>
                     </View>
                   </View>

@@ -59,6 +59,12 @@ const carpoolSchema = new mongoose.Schema({
         }],
         required: true
     },
+    // Reports array
+    reports: [{
+        reportedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        reason: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now }
+    }],
     pickupLocation: {
         type: String,
         required: true,

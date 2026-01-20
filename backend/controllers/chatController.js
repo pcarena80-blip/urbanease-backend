@@ -161,6 +161,13 @@ const sendMessage = async (req, res) => {
                 ...formattedMessage,
                 sender: 'others' // Broadcast as 'others' to receivers
             });
+        } else {
+            // Private Chat Emission
+            console.log(`Emitting 'new_private_message' to room: ${receiverId}`);
+            req.io.to(receiverId).emit('new_private_message', {
+                ...formattedMessage,
+                sender: 'others'
+            });
         }
     }
 

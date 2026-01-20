@@ -19,4 +19,24 @@ api.interceptors.request.use(
     (error) => Promise.reject(error)
 );
 
+// Add a response interceptor to handle auth errors and logging
+api.interceptors.response.use(
+    (response) => {
+        return response;
+    },
+    (error) => {
+        console.error("API Call Failed:", error.response?.status, error.config?.url);
+        if (error.response && error.response.status === 401) {
+            // Auto-logout on unauthorized
+            console.log("Session expired, redirecting to login...");
+            localStorage.removeItem('adminToken');
+            // Check if we are not already on the login page to avoid loops
+            if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+            }
+        }
+        return Promise.reject(error);
+    }
+);
+
 export default api;

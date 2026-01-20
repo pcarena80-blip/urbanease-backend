@@ -11,6 +11,7 @@ if (!fs.existsSync(uploadDir)) {
 // Configure storage
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
+        console.log('[UPLOAD] Multer destination called for:', file.originalname);
         cb(null, uploadDir);
     },
     filename: function (req, file, cb) {
@@ -22,7 +23,8 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-    // Accept all files
+    console.log(`[UPLOAD] Processing file: ${file.originalname} (${file.mimetype})`);
+    // Accept all files - frontend handles filtering, backend stores generic 'attachment'
     cb(null, true);
 };
 

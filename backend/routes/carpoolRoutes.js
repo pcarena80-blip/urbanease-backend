@@ -14,4 +14,10 @@ router.route('/')
 router.route('/:id')
     .delete(protect, deleteCarpool);
 
+router.route('/:id/report')
+    .post(protect, require('../controllers/carpoolController').reportCarpool);
+
+router.route('/:id/block')
+    .delete(protect, require('../middleware/adminMiddleware'), require('../controllers/carpoolController').blockCarpool);
+
 module.exports = router;

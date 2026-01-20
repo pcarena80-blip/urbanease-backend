@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, ListRenderItem, RefreshControl } from 'react-native';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, ListRenderItem, RefreshControl, TextInput } from 'react-native';
 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
-import { ArrowLeft, User, Car, Clock, Phone, MapPin, Plus, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, User, Car, Clock, Phone, MapPin, Plus, Trash2, Search, X, Flag } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BASE_URL } from '../services/api';
 
@@ -15,7 +15,14 @@ interface CarpoolListing {
     vehicleNumber: string;
     seatingCapacity: number;
     seatsAvailable: number;
-    schedule: { day: string; time: string }[];
+    tripType: string;
+    schedule: {
+        day: string;
+        goingTime: string;
+        goingPeriod: string;
+        returnTime?: string;
+        returnPeriod?: string;
+    }[];
     pickupLocation: string;
     destination: string;
     provider: string; // userId
@@ -28,6 +35,11 @@ export default function CarpoolScreen() {
     const [isRefreshing, setIsRefreshing] = useState(false); // Valid state
     const [visibleContacts, setVisibleContacts] = useState<{ [key: string]: boolean }>({});
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    const filteredListings = listings.filter(listing =>
+        listing.destination?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     // Auto-refresh when screen comes into focus
     useFocusEffect(
@@ -118,14 +130,58 @@ export default function CarpoolScreen() {
         );
     };
 
+    const handleReport = (id: string) => {
+        Alert.alert(
+            'Report Listing',
+            'Why are you reporting this listing?',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                { text: 'Spam / Fake', onPress: () => submitReport(id, 'Spam or Fake Listing') },
+                { text: 'Harassment', onPress: () => submitReport(id, 'Harassment or Inappropriate') },
+                { text: 'Other', onPress: () => submitReport(id, 'Other Issue') },
+            ]
+        );
+    };
+
+    const submitReport = async (id: string, reason: string) => {
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const response = await fetch(`${BASE_URL}/carpool/${id}/report`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ reason })
+            });
+
+            const data = await response.json();
+
+            if (response.ok) {
+                Alert.alert('Report Submitted', 'Thank you for keeping the community safe.');
+            } else {
+                Alert.alert('Error', data.message || 'Failed to submit report');
+            }
+        } catch (error) {
+            Alert.alert('Error', 'Network error while reporting');
+        }
+    };
+
     const renderItem: ListRenderItem<CarpoolListing> = ({ item }) => (
         <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100">
-            {currentUserId === item.provider && (
+            {currentUserId === item.provider ? (
                 <TouchableOpacity
                     onPress={() => handleDelete(item._id)}
                     className="absolute top-4 right-4 z-10"
                 >
                     <Trash2 size={18} color="#EF4444" />
+                </TouchableOpacity>
+            ) : (
+                <TouchableOpacity
+                    onPress={() => handleReport(item._id)}
+                    className="absolute top-4 right-4 z-10 p-1"
+                >
+                    <Flag size={18} color="#9CA3AF" />
                 </TouchableOpacity>
             )}
 
@@ -148,12 +204,15 @@ export default function CarpoolScreen() {
                 <View className="flex-row items-start gap-3">
                     <Clock size={18} color="#9CA3AF" style={{ marginTop: 2 }} />
                     <View className="flex-1">
-                        <Text className="text-sm font-medium text-gray-900 mb-1">Schedule</Text>
+                        <Text className="text-sm font-medium text-gray-900 mb-1">
+                            Schedule ({item.tripType === 'one-way' ? 'One-Way' : 'Two-Way'})
+                        </Text>
                         <View className="flex-row flex-wrap gap-2">
                             {item.schedule && item.schedule.map((slot, idx) => (
                                 <View key={idx} className="bg-gray-100 px-2 py-1 rounded-md">
                                     <Text className="text-[11px] text-gray-700 font-medium">
-                                        {slot.day}: {slot.time}
+                                        {slot.day}: {slot.goingTime} {slot.goingPeriod}
+                                        {slot.returnTime ? ` → ${slot.returnTime} ${slot.returnPeriod}` : ''}
                                     </Text>
                                 </View>
                             ))}
@@ -231,13 +290,32 @@ export default function CarpoolScreen() {
                 </TouchableOpacity>
             </View>
 
+            {/* Search Bar */}
+            <View className="px-4 pb-4 bg-white border-b border-gray-100 z-10">
+                <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200">
+                    <Search size={20} color="#9CA3AF" />
+                    <TextInput
+                        placeholder="Search by destination (e.g., F-8, Blue Area)"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        className="flex-1 ml-3 text-base text-gray-900"
+                        placeholderTextColor="#9CA3AF"
+                    />
+                    {searchQuery.length > 0 && (
+                        <TouchableOpacity onPress={() => setSearchQuery('')}>
+                            <X size={18} color="#9CA3AF" />
+                        </TouchableOpacity>
+                    )}
+                </View>
+            </View>
+
             {isLoading && listings.length === 0 ? (
                 <View className="flex-1 justify-center items-center pt-20">
                     <ActivityIndicator size="large" color="#027A4C" />
                 </View>
             ) : (
                 <FlatList
-                    data={listings}
+                    data={filteredListings}
                     renderItem={renderItem}
                     keyExtractor={(item) => item._id}
                     contentContainerStyle={{ padding: 16, paddingBottom: 100 }}

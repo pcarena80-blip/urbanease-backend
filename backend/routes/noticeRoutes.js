@@ -6,8 +6,8 @@ const { protect } = require('../middleware/authMiddleware');
 // Get all notices (for mobile app)
 router.get('/', protect, async (req, res) => {
     try {
-        // Get all notices, sorted by newest first
-        const notices = await Notice.find().sort({ createdAt: -1 });
+        // Get active notices (expiryDate >= now), sorted by newest first
+        const notices = await Notice.find({ expiryDate: { $gte: new Date() } }).sort({ createdAt: -1 });
         res.json(notices);
     } catch (error) {
         console.error('Error fetching notices:', error);

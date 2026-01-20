@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Paperclip, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { socketService } from '../services/socket';
 import { api } from '../services/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ImageViewer from './ImageViewer';
@@ -19,59 +20,103 @@ export default function PrivateChatDetail() {
     const [viewerImage, setViewerImage] = useState<string | null>(null);
     const [unreadCount, setUnreadCount] = useState(0);
     const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const flatListRef = useRef<FlatList>(null);
-
     useEffect(() => {
         loadUser();
         initializeChat();
 
-        // Poll for new messages every 3s
-        const interval = setInterval(loadMessages, 3000);
+        let socketSubscription: any;
+
+        const setupSocket = async () => {
+            try {
+                // Ensure connection
+                await socketService.connect();
+
+                // Listen for new messages
+                socketService.on('new_private_message', (newMsg: any) => {
+                    console.log('[PrivateChat] Real-time message received:', newMsg);
+
+                    // Verify correct chat
+                    if (newMsg.senderId === chat.id) {
+                        setMessages(prev => {
+                            // Deduplicate just in case
+                            if (prev.some(m => m.id === newMsg.id)) return prev;
+                            return [...prev, newMsg];
+                        });
+                        // Mark as read
+                        api.chat.markAsRead(chat.id);
+                    }
+                });
+            } catch (e) {
+                console.error('Socket setup failed:', e);
+            }
+        };
+
+        setupSocket();
+
+        // Polling fallback (every 10s)
+        const interval = setInterval(loadMessages, 10000);
 
         return () => {
             clearInterval(interval);
+            socketService.off('new_private_message');
         };
     }, []);
 
     const initializeChat = async () => {
+        if (!chat?.id) {
+            console.error('[PrivateChat] ERROR: No chat.id provided!', chat);
+            setIsLoading(false);
+            return;
+        }
+
+        console.log('[PrivateChat] Initializing chat with ID:', chat.id);
+        setIsLoading(true);
+
         try {
             const [msgs, counts] = await Promise.all([
                 api.chat.getMessages(chat.id),
                 api.chat.getUnreadCounts()
             ]);
 
-            setMessages(msgs);
+            console.log('[PrivateChat] API Response - msgs:', msgs);
+            console.log('[PrivateChat] API Response - msgs type:', typeof msgs, 'isArray:', Array.isArray(msgs));
+            console.log('[PrivateChat] API Response - msgs length:', msgs?.length);
+
+            // CRITICAL: Ensure msgs is an array
+            const messagesArray = Array.isArray(msgs) ? msgs : [];
+            console.log('[PrivateChat] Setting messages array of length:', messagesArray.length);
+            setMessages(messagesArray);
 
             let count = 0;
-            if (counts.privateChats && counts.privateChats[chat.id]) {
+            if (counts?.privateChats && counts.privateChats[chat.id]) {
                 count = counts.privateChats[chat.id];
             }
             setUnreadCount(count);
 
             // Scroll Logic
-            if (msgs.length > 0) {
+            if (messagesArray.length > 0) {
+                console.log('[PrivateChat] Scheduling scroll to index...');
                 setTimeout(() => {
-                    let index = msgs.length - 1; // Default to bottom (newest)
+                    let index = messagesArray.length - 1;
                     if (count > 0) {
-                        // If 3 unread, and length is 10. Indices 0..9.
-                        // Unread are 7, 8, 9. First unread is 7 -> length - count.
-                        index = Math.max(0, msgs.length - count);
+                        index = Math.max(0, messagesArray.length - count);
                     }
 
                     flatListRef.current?.scrollToIndex({
                         index,
                         animated: true,
-                        viewPosition: 0 // Top of the item
+                        viewPosition: 0
                     });
-                }, 500); // Delay to allow render
+                }, 500);
             }
 
-            // Mark as read after a delay to ensure user 'sees' it? 
-            // Or just mark it.
             await api.chat.markAsRead(chat.id);
-            // setUnreadCount(0); // Optional: clear badge immediately
         } catch (e) {
-            console.log('Init failed', e);
+            console.error('[PrivateChat] Init failed:', e);
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -81,11 +126,25 @@ export default function PrivateChatDetail() {
     };
 
     const loadMessages = async () => {
+        if (!chat?.id) return;
+
         try {
             const data = await api.chat.getMessages(chat.id);
-            setMessages(data);
+            console.log('[PrivateChat] loadMessages - raw data:', data);
+            console.log('[PrivateChat] loadMessages - type:', typeof data, 'isArray:', Array.isArray(data));
+
+            // CRITICAL: Ensure we always set an array
+            const messagesArray = Array.isArray(data) ? data : [];
+            console.log('[PrivateChat] loadMessages - setting', messagesArray.length, 'messages');
+
+            if (messagesArray.length > 0) {
+                console.log('[PrivateChat] First msg:', messagesArray[0]?.id, messagesArray[0]?.message?.substring(0, 30));
+                console.log('[PrivateChat] Last msg:', messagesArray[messagesArray.length - 1]?.id, messagesArray[messagesArray.length - 1]?.message?.substring(0, 30));
+            }
+
+            setMessages(messagesArray);
         } catch (error) {
-            console.log('Error loading private messages:', error);
+            console.error('[PrivateChat] loadMessages ERROR:', error);
         }
     };
 
@@ -133,19 +192,35 @@ export default function PrivateChatDetail() {
     const handleSend = async () => {
         if (!messageText.trim() && !selectedImage) return;
 
+        const tempMessage = {
+            id: `temp-${Date.now()}`,
+            senderId: user?._id,
+            sender: 'user',
+            message: messageText.trim(),
+            timestamp: new Date().toISOString(),
+            attachment: selectedImage?.uri,
+            attachmentType: selectedImage ? 'image' : null
+        };
+
+        // Optimistic update - add message immediately
+        setMessages(prev => [...prev, tempMessage]);
+        setMessageText('');
+        const savedImage = selectedImage;
+        setSelectedImage(null);
+
         try {
-            if (selectedImage) {
+            if (savedImage) {
                 const formData = new FormData();
                 formData.append('receiverId', chat.id);
-                if (messageText.trim()) {
-                    formData.append('message', messageText);
+                if (tempMessage.message) {
+                    formData.append('message', tempMessage.message);
                 }
 
                 // Append file
                 // @ts-ignore
                 formData.append('file', {
-                    uri: selectedImage.uri,
-                    type: 'image/jpeg', // Force jpeg or use mimeType from picker
+                    uri: savedImage.uri,
+                    type: 'image/jpeg',
                     name: 'upload.jpg',
                 });
 
@@ -153,30 +228,36 @@ export default function PrivateChatDetail() {
             } else {
                 await api.chat.sendMessage({
                     receiverId: chat.id,
-                    message: messageText
+                    message: tempMessage.message
                 });
             }
 
-            setMessageText('');
-            setSelectedImage(null);
-            loadMessages();
+            // Reload to get server-confirmed messages
+            await loadMessages();
         } catch (error) {
             console.error('Send failed:', error);
+            // Remove optimistic message on failure
+            setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
             Alert.alert('Error', 'Failed to send message');
         }
     };
 
     const renderItem = ({ item: msg }: { item: any }) => {
+        if (!msg) return null;
+
         const isMe = msg.senderId === user?._id || msg.sender === 'user';
+        const hasMessage = msg.message && msg.message.trim().length > 0;
+        const hasImage = msg.attachment && msg.attachmentType === 'image';
+
         return (
             <View className={`flex-row mb-4 ${isMe ? 'justify-end' : 'justify-start'} px-6`}>
                 <View className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                    {/* Image Message - NO bubble, just clean image */}
-                    {msg.attachment && msg.attachmentType === 'image' && (
+                    {/* Image Message */}
+                    {hasImage && (
                         <TouchableOpacity
                             onPress={() => setViewerImage(api.getImageUrl(msg.attachment))}
                             activeOpacity={0.9}
-                            style={{ marginBottom: msg.message ? 8 : 0 }}
+                            style={{ marginBottom: hasMessage ? 8 : 0 }}
                         >
                             <Image
                                 source={{ uri: api.getImageUrl(msg.attachment) }}
@@ -193,8 +274,8 @@ export default function PrivateChatDetail() {
                         </TouchableOpacity>
                     )}
 
-                    {/* Text Message - WITH bubble */}
-                    {msg.message && (
+                    {/* Text Message */}
+                    {hasMessage && (
                         <View
                             className={`p-3.5 ${isMe
                                 ? 'bg-[#F1F8F4] rounded-2xl rounded-tr-sm'
@@ -206,8 +287,10 @@ export default function PrivateChatDetail() {
                             </Text>
                         </View>
                     )}
+
+                    {/* Timestamp */}
                     <Text className="text-gray-400 mt-1 text-[11px]">
-                        {new Date(msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Text>
                 </View>
             </View>
@@ -269,10 +352,23 @@ export default function PrivateChatDetail() {
                     <FlatList
                         ref={flatListRef}
                         data={messages}
-                        keyExtractor={(item) => item.id.toString()}
+                        keyExtractor={(item, index) => item?.id?.toString() || `msg-${index}`}
                         renderItem={renderItem}
-                        contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24 }}
+                        contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24, flexGrow: 1 }}
                         className="flex-1 bg-gray-50"
+
+                        ListEmptyComponent={
+                            <View className="flex-1 items-center justify-center py-20">
+                                {isLoading ? (
+                                    <>
+                                        <ActivityIndicator size="large" color="#027A4C" />
+                                        <Text className="text-gray-400 mt-4">Loading messages...</Text>
+                                    </>
+                                ) : (
+                                    <Text className="text-gray-400 text-center">No messages yet.{'\n'}Start the conversation!</Text>
+                                )}
+                            </View>
+                        }
                         onScrollToIndexFailed={info => {
                             const wait = new Promise(resolve => setTimeout(resolve, 500));
                             wait.then(() => {

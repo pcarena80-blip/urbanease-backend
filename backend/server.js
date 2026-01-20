@@ -26,13 +26,14 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // Performance: Cache-Control headers for API responses
-app.use((req, res, next) => {
-    // Cache GET requests for 30 seconds (stale-while-revalidate for 60s)
-    if (req.method === 'GET') {
-        res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
-    }
-    next();
-});
+// Performance: Cache-Control headers for API responses
+// app.use((req, res, next) => {
+//     // Cache GET requests for 30 seconds (stale-while-revalidate for 60s)
+//     if (req.method === 'GET') {
+//         res.set('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+//     }
+//     next();
+// });
 
 // Serve static files (uploads) with aggressive caching
 app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
@@ -107,6 +108,11 @@ io.on('connection', (socket) => {
     socket.on('join_community', () => {
         socket.join('community');
         console.log(`Client ${socket.id} joined community`);
+    });
+
+    socket.on('join_private', (userId) => {
+        socket.join(userId);
+        console.log(`Client ${socket.id} joined private room: ${userId}`);
     });
 
     socket.on('disconnect', () => {

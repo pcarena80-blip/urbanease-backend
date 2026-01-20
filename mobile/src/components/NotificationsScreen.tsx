@@ -6,52 +6,7 @@ import { useNavigation } from '@react-navigation/native';
 export default function NotificationsScreen() {
     const navigation = useNavigation<any>();
 
-    const notifications = [
-        {
-            id: 1,
-            type: 'bill',
-            title: 'New Bill Generated',
-            description: 'Your electricity bill for December 2024 is now available.',
-            time: '2 hours ago',
-            read: false,
-            icon: Receipt,
-            color: '#FF9800',
-            bg: '#FFF4E6'
-        },
-        {
-            id: 2,
-            type: 'complaint',
-            title: 'Complaint Resolved',
-            description: 'Your complaint #CMP-2024-001 regarding water leakage has been resolved.',
-            time: '1 day ago',
-            read: true,
-            icon: ClipboardList,
-            color: '#4CAF50',
-            bg: '#E8F5E9'
-        },
-        {
-            id: 3,
-            type: 'notice',
-            title: 'Community Meeting',
-            description: 'Reminder: Annual general meeting is scheduled for this Friday at 5 PM.',
-            time: '2 days ago',
-            read: true,
-            icon: Info,
-            color: '#2196F3',
-            bg: '#E3F2FD'
-        },
-        {
-            id: 4,
-            type: 'chat',
-            title: 'New Message',
-            description: 'You have a new message from the Building Admin.',
-            time: '3 days ago',
-            read: true,
-            icon: MessageSquare,
-            color: '#027A4C',
-            bg: '#F1F8F4'
-        }
-    ];
+    const notifications: any[] = [];
 
     return (
         <View className="h-full bg-gray-50">

@@ -193,7 +193,11 @@ export default function ComplaintsScreen() {
                     </View>
                   </View>
                   <Text className="text-gray-400 text-[11px]">
-                    {complaint.date}
+                    {new Date(complaint.createdAt).toLocaleDateString(undefined, {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric'
+                    })}
                   </Text>
                 </View>
 

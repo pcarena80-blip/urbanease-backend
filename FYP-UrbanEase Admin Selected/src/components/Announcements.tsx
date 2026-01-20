@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Trash2, Calendar, Clock, History, Bell, AlertCircle } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, History, Bell, AlertCircle, Upload } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 
@@ -25,6 +25,7 @@ export function Announcements() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [expiryDate, setExpiryDate] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -102,11 +103,26 @@ export function Announcements() {
     try {
       setSubmitting(true);
       setFormError(null);
-      await api.post('/admin/notices', { title, description, expiryDate });
+
+      const formData = new FormData();
+      formData.append('title', title);
+      formData.append('description', description);
+      formData.append('expiryDate', expiryDate);
+      if (selectedFile) {
+        formData.append('file', selectedFile);
+      }
+
+      await api.post('/admin/notices', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
       setShowForm(false);
       setTitle('');
       setDescription('');
       setExpiryDate('');
+      setSelectedFile(null);
       fetchNotices();
     } catch (error: any) {
       console.error("Failed to create notice", error);
@@ -118,6 +134,7 @@ export function Announcements() {
 
   const handleDeleteNotice = async (id: string) => {
     if (!confirm('Are you sure you want to delete this notice?')) return;
+
     try {
       await api.delete(`/admin/notices/${id}`);
       if (activeTab === 'active') {
@@ -125,8 +142,9 @@ export function Announcements() {
       } else {
         fetchHistoryNotices();
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to delete notice", error);
+      alert(error.response?.data?.message || "Failed to delete notice");
     }
   };
 
@@ -164,10 +182,10 @@ export function Announcements() {
         <button
           onClick={() => setActiveTab('active')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === 'active'
-              ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
-              : theme === 'dark'
-                ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+            : theme === 'dark'
+              ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
           <Bell className="w-4 h-4" />
@@ -176,10 +194,10 @@ export function Announcements() {
         <button
           onClick={() => setActiveTab('history')}
           className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${activeTab === 'history'
-              ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
-              : theme === 'dark'
-                ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+            : theme === 'dark'
+              ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
             }`}
         >
           <History className="w-4 h-4" />
@@ -225,6 +243,29 @@ export function Announcements() {
                   : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               ></textarea>
+            </div>
+
+            <div>
+              <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Attachment (Image)</label>
+              <div className={`border-2 border-dashed rounded-lg p-4 ${theme === 'dark' ? 'border-[#333333] bg-[#1A1A1A]' : 'border-gray-200 bg-gray-50'}`}>
+                <input
+                  type="file"
+                  accept="image/png, image/jpeg, image/jpg, image/gif, image/webp, image/bmp"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setSelectedFile(e.target.files[0]);
+                    }
+                  }}
+                  className="hidden"
+                  id="notice-file"
+                />
+                <label htmlFor="notice-file" className="flex flex-col items-center justify-center cursor-pointer">
+                  <Upload className={`w-8 h-8 mb-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`} />
+                  <span className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {selectedFile ? selectedFile.name : 'Click to upload an image'}
+                  </span>
+                </label>
+              </div>
             </div>
             <div>
               <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Expiry Date *</label>
@@ -287,6 +328,25 @@ export function Announcements() {
                     )}
                   </div>
                   <p className={`mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{notice.description}</p>
+
+                  {/* Attachment Image */}
+                  {(notice as any).attachment && (
+                    <div className="mb-3">
+                      <img
+                        src={(notice as any).attachment.startsWith('http')
+                          ? (notice as any).attachment
+                          : `http://localhost:5000/${(notice as any).attachment.replace(/\\/g, '/')}`}
+                        alt="Notice attachment"
+                        className="h-32 rounded-lg object-cover border border-gray-200"
+                        onError={(e) => {
+                          console.error('Image load error:', (e.target as HTMLImageElement).src);
+                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=Image+Load+Error';
+                        }}
+                      />
+                      <p className="text-xs text-gray-400 mt-1 break-all">Path: {(notice as any).attachment}</p>
+                    </div>
+                  )}
+
                   <div className={`flex items-center gap-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     <div className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
