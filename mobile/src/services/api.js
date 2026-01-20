@@ -112,6 +112,10 @@ const request = async (endpoint, options = {}, retries = 3) => {
             await new Promise(resolve => setTimeout(resolve, delay));
             return request(endpoint, options, retries - 1);
         }
+        // If timeout specifically
+        if (error.message.includes('Aborted') || error.message.includes('timeout')) {
+            throw new Error('Connection timed out. Server is slow or busy.');
+        }
         return handleApiError(error, endpoint);
     }
 };

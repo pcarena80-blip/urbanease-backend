@@ -18,8 +18,11 @@ export const socketService = {
         socket = io(socketUrl, {
             auth: { token },
             query: { userId: user?._id },
-            transports: ['websocket'], // Force websocket
-            jsonp: false
+            transports: ['websocket', 'polling'], // Allow fallback
+            jsonp: false,
+            reconnection: true,
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
         });
 
         socket.on('connect', () => {
