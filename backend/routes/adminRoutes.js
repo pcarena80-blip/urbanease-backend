@@ -341,6 +341,7 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
 
 // Get Dashboard Graph Data (Real-time aggregation)
 router.get('/stats/graphs', protect, adminMiddleware, async (req, res) => {
+    console.log('[DEBUG] Hit /stats/graphs endpoint');
     try {
         const now = new Date();
 

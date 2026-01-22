@@ -193,7 +193,9 @@ const registerUser = async (req, res) => {
                 name: user.name,
                 email: user.email,
                 phone: user.phone,
-                token: generateToken(user.id),
+                message: 'Registration successful. Waiting for admin approval.',
+                isVerified: false
+                // No token returned, so frontend won't auto-login
             });
         }
     } catch (error) {

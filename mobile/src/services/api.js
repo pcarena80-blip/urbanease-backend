@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Local Network Dev (Localtunnel)
 // const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
 // Local Network Dev (Direct WiFi) - DEV ONLY (Use this when running backend locally)
+// Local Network Dev (Direct WiFi) - DEV ONLY (Use this when running backend locally)
 // export const BASE_URL = 'http://192.168.18.131:5000/api';
 // AWS Direct HTTP - PRODUCTION
 export const BASE_URL = 'http://51.20.34.254:5000/api';

@@ -74,19 +74,21 @@ export default function PrivateChatDetail() {
         console.log('[PrivateChat] Initializing chat with ID:', chat.id);
         setIsLoading(true);
 
+        // Timeout promise to prevent infinite loading
+        const timeout = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Request timed out')), 10000)
+        );
+
         try {
-            const [msgs, counts] = await Promise.all([
-                api.chat.getMessages(chat.id),
-                api.chat.getUnreadCounts()
+            const [msgs, counts] = await Promise.race([
+                Promise.all([
+                    api.chat.getMessages(chat.id),
+                    api.chat.getUnreadCounts()
+                ]),
+                timeout
             ]);
 
-            console.log('[PrivateChat] API Response - msgs:', msgs);
-            console.log('[PrivateChat] API Response - msgs type:', typeof msgs, 'isArray:', Array.isArray(msgs));
-            console.log('[PrivateChat] API Response - msgs length:', msgs?.length);
-
-            // CRITICAL: Ensure msgs is an array
             const messagesArray = Array.isArray(msgs) ? msgs : [];
-            console.log('[PrivateChat] Setting messages array of length:', messagesArray.length);
             setMessages(messagesArray);
 
             let count = 0;
@@ -95,26 +97,11 @@ export default function PrivateChatDetail() {
             }
             setUnreadCount(count);
 
-            // Scroll Logic
-            if (messagesArray.length > 0) {
-                console.log('[PrivateChat] Scheduling scroll to index...');
-                setTimeout(() => {
-                    let index = messagesArray.length - 1;
-                    if (count > 0) {
-                        index = Math.max(0, messagesArray.length - count);
-                    }
-
-                    flatListRef.current?.scrollToIndex({
-                        index,
-                        animated: true,
-                        viewPosition: 0
-                    });
-                }, 500);
-            }
-
+            // Mark as read immediately
             await api.chat.markAsRead(chat.id);
         } catch (e) {
-            console.error('[PrivateChat] Init failed:', e);
+            console.error('[PrivateChat] Init failed or timed out:', e);
+            Alert.alert('Notice', 'Could not load latest messages. Please check your connection.');
         } finally {
             setIsLoading(false);
         }
@@ -130,19 +117,18 @@ export default function PrivateChatDetail() {
 
         try {
             const data = await api.chat.getMessages(chat.id);
-            console.log('[PrivateChat] loadMessages - raw data:', data);
-            console.log('[PrivateChat] loadMessages - type:', typeof data, 'isArray:', Array.isArray(data));
-
-            // CRITICAL: Ensure we always set an array
             const messagesArray = Array.isArray(data) ? data : [];
-            console.log('[PrivateChat] loadMessages - setting', messagesArray.length, 'messages');
 
-            if (messagesArray.length > 0) {
-                console.log('[PrivateChat] First msg:', messagesArray[0]?.id, messagesArray[0]?.message?.substring(0, 30));
-                console.log('[PrivateChat] Last msg:', messagesArray[messagesArray.length - 1]?.id, messagesArray[messagesArray.length - 1]?.message?.substring(0, 30));
-            }
+            // Only update if changes to avoid re-renders
+            setMessages(prev => {
+                const prevIds = new Set(prev.map(m => m.id));
+                const hasChanges = messagesArray.some(m => !prevIds.has(m.id)) || messagesArray.length !== prev.length;
+                if (hasChanges) {
+                    return messagesArray;
+                }
+                return prev;
+            });
 
-            setMessages(messagesArray);
         } catch (error) {
             console.error('[PrivateChat] loadMessages ERROR:', error);
         }
@@ -192,8 +178,10 @@ export default function PrivateChatDetail() {
     const handleSend = async () => {
         if (!messageText.trim() && !selectedImage) return;
 
+        // Optimistic update - add message immediately
+        const optimisticId = `temp-${Date.now()}`;
         const tempMessage = {
-            id: `temp-${Date.now()}`,
+            id: optimisticId,
             senderId: user?._id,
             sender: 'user',
             message: messageText.trim(),
@@ -202,7 +190,6 @@ export default function PrivateChatDetail() {
             attachmentType: selectedImage ? 'image' : null
         };
 
-        // Optimistic update - add message immediately
         setMessages(prev => [...prev, tempMessage]);
         setMessageText('');
         const savedImage = selectedImage;
@@ -216,12 +203,16 @@ export default function PrivateChatDetail() {
                     formData.append('message', tempMessage.message);
                 }
 
-                // Append file
+                // Append file with robust filename/type
+                const filename = savedImage.uri.split('/').pop() || 'upload.jpg';
+                const match = /\.(\w+)$/.exec(filename);
+                const type = match ? `image/${match[1]}` : 'image/jpeg';
+
                 // @ts-ignore
                 formData.append('file', {
-                    uri: savedImage.uri,
-                    type: 'image/jpeg',
-                    name: 'upload.jpg',
+                    uri: Platform.OS === 'ios' ? savedImage.uri.replace('file://', '') : savedImage.uri,
+                    name: filename,
+                    type: type,
                 });
 
                 await api.chat.sendMessage(formData);
@@ -232,12 +223,13 @@ export default function PrivateChatDetail() {
                 });
             }
 
-            // Reload to get server-confirmed messages
+            // Correctly remove the temp message when real one loads, or just reload all
+            // Ideally we replace the temp message with the real one, but reloading is safer for sync
             await loadMessages();
         } catch (error) {
             console.error('Send failed:', error);
             // Remove optimistic message on failure
-            setMessages(prev => prev.filter(m => m.id !== tempMessage.id));
+            setMessages(prev => prev.filter(m => m.id !== optimisticId));
             Alert.alert('Error', 'Failed to send message');
         }
     };
@@ -356,7 +348,18 @@ export default function PrivateChatDetail() {
                         renderItem={renderItem}
                         contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24, flexGrow: 1 }}
                         className="flex-1 bg-gray-50"
-
+                        onContentSizeChange={() => {
+                            // Only scroll to bottom if there are no unread messages we are trying to view
+                            // Or if we just sent a message
+                            if (messages.length > 0) {
+                                flatListRef.current?.scrollToEnd({ animated: true });
+                            }
+                        }}
+                        onLayout={() => {
+                            if (messages.length > 0) {
+                                flatListRef.current?.scrollToEnd({ animated: false });
+                            }
+                        }}
                         ListEmptyComponent={
                             <View className="flex-1 items-center justify-center py-20">
                                 {isLoading ? (
@@ -369,12 +372,6 @@ export default function PrivateChatDetail() {
                                 )}
                             </View>
                         }
-                        onScrollToIndexFailed={info => {
-                            const wait = new Promise(resolve => setTimeout(resolve, 500));
-                            wait.then(() => {
-                                flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
-                            });
-                        }}
                     />
 
                     {/* Image Preview */}
