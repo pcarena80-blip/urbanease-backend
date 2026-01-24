@@ -11,7 +11,6 @@ import WelcomeScreen from './src/components/WelcomeScreen';
 import LoginScreen from './src/components/LoginScreen';
 import SignupScreen from './src/components/SignupScreen';
 import BottomNav from './src/components/BottomNav';
-import Link from './src/components/BottomNav'; // Keeping original import if name matches
 // Decreased usage of BillsScreen
 import CarpoolScreen from './src/components/CarpoolScreen';
 import CarpoolForm from './src/components/CarpoolForm';

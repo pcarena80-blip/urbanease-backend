@@ -1,7 +1,7 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, ClipboardList, MessageSquare, User, FileText } from 'lucide-react-native';
-import { View, Text } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import HomeScreen from './HomeScreen';
 import ComplaintsScreen from './ComplaintsScreen';
 import NoticesScreen from './NoticeBoard';
@@ -77,3 +77,7 @@ export default function BottomNav() {
     </Tab.Navigator>
   );
 }
+
+
+
+

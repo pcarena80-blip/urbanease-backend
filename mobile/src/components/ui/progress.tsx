@@ -1,7 +1,8 @@
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 "use client";
 
 import * as React from "react";
-import * as ProgressPrimitive from "@radix-ui/react-progress@1.1.2";
+import * as ProgressPrimitive from "@radix-ui/react-progress";
 
 import { cn } from "./utils";
 
@@ -29,3 +30,7 @@ function Progress({
 }
 
 export { Progress };
+
+
+
+

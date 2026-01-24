@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Alert, ListRenderItem, RefreshControl, TextInput } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, FlatList, RefreshControl, ListRenderItem } from 'react-native';
 
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, User, Car, Clock, Phone, MapPin, Plus, Trash2, Search, X, Flag } from 'lucide-react-native';
@@ -330,3 +330,7 @@ export default function CarpoolScreen() {
         </View>
     );
 }
+
+
+
+

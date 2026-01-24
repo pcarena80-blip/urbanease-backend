@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Image, TouchableOpacity, StyleSheet, Dimensions, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, Dimensions } from 'react-native';
 import { X } from 'lucide-react-native';
 
 const { width, height } = Dimensions.get('window');
@@ -65,3 +65,7 @@ const styles = StyleSheet.create({
         height: height * 0.8,
     },
 });
+
+
+
+

@@ -1,12 +1,12 @@
 import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import { ArrowLeft, Mail, Lock, Building2, Eye, EyeOff } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
 import { api } from '../services/api';
 
 export default function ForgotPasswordScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const [step, setStep] = useState<'email' | 'otp' | 'reset'>('email');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
@@ -237,3 +237,7 @@ export default function ForgotPasswordScreen() {
     </View>
   );
 }
+
+
+
+

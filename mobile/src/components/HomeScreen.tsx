@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
 import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight, Car } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -186,3 +186,7 @@ export default function HomeScreen() {
     </ScrollView>
   );
 }
+
+
+
+

@@ -1,8 +1,9 @@
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 "use client";
 
 import * as React from "react";
-import * as RadioGroupPrimitive from "@radix-ui/react-radio-group@1.2.3";
-import { CircleIcon } from "lucide-react@0.487.0";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
+import { CircleIcon } from "lucide-react-native";
 
 import { cn } from "./utils";
 
@@ -43,3 +44,8 @@ function RadioGroupItem({
 }
 
 export { RadioGroup, RadioGroupItem };
+
+
+
+
+

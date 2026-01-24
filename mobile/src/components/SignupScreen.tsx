@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Modal } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView } from 'react-native';
 import {
   Building2,
   User,
@@ -745,3 +745,6 @@ export default function SignupScreen() {
     </KeyboardAvoidingView>
   );
 }
+
+
+

@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import { ArrowLeft, Bell, Receipt, MessageSquare, ClipboardList, Info } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
@@ -61,3 +61,7 @@ export default function NotificationsScreen() {
         </View>
     );
 }
+
+
+
+

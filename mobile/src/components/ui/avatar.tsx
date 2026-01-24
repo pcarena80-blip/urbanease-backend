@@ -1,21 +1,19 @@
-"use client";
-
+import { View, Text, Image, StyleSheet } from 'react-native';
 import * as React from "react";
-import * as AvatarPrimitive from "@radix-ui/react-avatar@1.1.3";
-
 import { cn } from "./utils";
 
 function Avatar({
   className,
+  style,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Root>) {
+}: React.ComponentProps<typeof View>) {
   return (
-    <AvatarPrimitive.Root
-      data-slot="avatar"
+    <View
       className={cn(
-        "relative flex size-10 shrink-0 overflow-hidden rounded-full",
-        className,
+        "relative flex h-10 w-10 shrink-0 overflow-hidden rounded-full",
+        className
       )}
+      style={style}
       {...props}
     />
   );
@@ -23,12 +21,15 @@ function Avatar({
 
 function AvatarImage({
   className,
+  source,
+  style,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Image>) {
+}: React.ComponentProps<typeof Image>) {
   return (
-    <AvatarPrimitive.Image
-      data-slot="avatar-image"
-      className={cn("aspect-square size-full", className)}
+    <Image
+      className={cn("aspect-square h-full w-full", className)}
+      source={source}
+      style={style}
       {...props}
     />
   );
@@ -36,17 +37,21 @@ function AvatarImage({
 
 function AvatarFallback({
   className,
+  style,
+  children,
   ...props
-}: React.ComponentProps<typeof AvatarPrimitive.Fallback>) {
+}: React.ComponentProps<typeof View>) {
   return (
-    <AvatarPrimitive.Fallback
-      data-slot="avatar-fallback"
+    <View
       className={cn(
-        "bg-muted flex size-full items-center justify-center rounded-full",
-        className,
+        "bg-muted flex h-full w-full items-center justify-center rounded-full",
+        className
       )}
+      style={style}
       {...props}
-    />
+    >
+      <Text>{children}</Text>
+    </View>
   );
 }
 

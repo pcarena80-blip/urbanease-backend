@@ -1,5 +1,7 @@
+import { View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useState } from 'react';
-import { ArrowLeft, Upload, Image } from 'lucide-react';
+import { ArrowLeft, Upload, Check, Image as ImageIcon } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function RegisterComplaint({ onNavigate }: { onNavigate: (screen: string) => void }) {
   const [formData, setFormData] = useState({
@@ -8,6 +10,7 @@ export default function RegisterComplaint({ onNavigate }: { onNavigate: (screen:
     description: ''
   });
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
 
   const categories = [
     'Maintenance',
@@ -28,94 +31,120 @@ export default function RegisterComplaint({ onNavigate }: { onNavigate: (screen:
 
   if (showSuccess) {
     return (
-      <div className="h-full flex flex-col items-center justify-center px-6 bg-white">
-        <div className="w-20 h-20 rounded-full bg-[#00c878]/10 flex items-center justify-center mb-6">
-          <svg className="w-10 h-10 text-[#00c878]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
-        </div>
-        <h2 className="text-gray-900 mb-3 text-center">Complaint Registered!</h2>
-        <p className="text-gray-600 text-center">
+      <View className="flex-1 items-center justify-center px-6 bg-white">
+        <View className="w-20 h-20 rounded-full bg-green-100 items-center justify-center mb-6">
+          <Check size={40} color="#00c878" />
+        </View>
+        <Text className="text-gray-900 text-xl font-semibold mb-3 text-center">Complaint Registered!</Text>
+        <Text className="text-gray-600 text-center">
           Your complaint has been submitted successfully. You will be notified of updates.
-        </p>
-      </div>
+        </Text>
+      </View>
     );
   }
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="p-6" style={{
-        background: 'linear-gradient(135deg, #00c878 0%, #00e68a 100%)'
-      }}>
-        <button onClick={() => onNavigate('complaints')} className="text-white mb-4">
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <h1 className="text-white mb-2">Register Complaint</h1>
-        <p className="text-white/90">Submit your issue</p>
-      </div>
+    <View className="flex-1 bg-gray-50">
+      <LinearGradient
+        colors={['#00c878', '#00e68a']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="p-6"
+      >
+        <TouchableOpacity onPress={() => onNavigate('complaints')} className="mb-4">
+          <ArrowLeft size={24} color="white" />
+        </TouchableOpacity>
+        <Text className="text-white text-xl font-semibold mb-2">Register Complaint</Text>
+        <Text className="text-white/90">Submit your issue</Text>
+      </LinearGradient>
 
-      <div className="flex-1 overflow-y-auto px-6 py-6 pb-8">
-        <div className="bg-white rounded-3xl p-6 space-y-5">
-          <div>
-            <label className="block text-gray-700 mb-2">Category</label>
-            <select
-              value={formData.category}
-              onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#00c878]/20 focus:border-[#00c878] bg-white"
+      <ScrollView className="flex-1 px-6 py-6">
+        <View className="bg-white rounded-3xl p-6" style={{ gap: 20 }}>
+          {/* Category Picker */}
+          <View>
+            <Text className="text-gray-700 mb-2 font-medium">Category</Text>
+            <TouchableOpacity
+              onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+              className="w-full px-4 py-4 border border-gray-200 rounded-2xl bg-white"
             >
-              <option value="">Select category</option>
-              {categories.map((cat, index) => (
-                <option key={cat || index} value={cat}>{cat}</option>
-              ))}
-            </select>
-          </div>
+              <Text className={formData.category ? "text-gray-900" : "text-gray-400"}>
+                {formData.category || 'Select category'}
+              </Text>
+            </TouchableOpacity>
 
-          <div>
-            <label className="block text-gray-700 mb-2">Title</label>
-            <input
-              type="text"
+            {showCategoryPicker && (
+              <View className="mt-2 bg-white border border-gray-200 rounded-xl overflow-hidden">
+                {categories.map((cat, index) => (
+                  <TouchableOpacity
+                    key={cat || index}
+                    onPress={() => {
+                      setFormData({ ...formData, category: cat });
+                      setShowCategoryPicker(false);
+                    }}
+                    className="px-4 py-3 border-b border-gray-100"
+                  >
+                    <Text className="text-gray-700">{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Title Input */}
+          <View>
+            <Text className="text-gray-700 mb-2 font-medium">Title</Text>
+            <TextInput
               value={formData.title}
-              onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+              onChangeText={(text) => setFormData({ ...formData, title: text })}
               placeholder="Brief description of the issue"
-              className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#00c878]/20 focus:border-[#00c878]"
+              placeholderTextColor="#9CA3AF"
+              className="w-full px-4 py-4 border border-gray-200 rounded-2xl bg-white"
             />
-          </div>
+          </View>
 
-          <div>
-            <label className="block text-gray-700 mb-2">Description</label>
-            <textarea
+          {/* Description Input */}
+          <View>
+            <Text className="text-gray-700 mb-2 font-medium">Description</Text>
+            <TextInput
               value={formData.description}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              onChangeText={(text) => setFormData({ ...formData, description: text })}
               placeholder="Provide detailed information about your complaint"
-              rows={5}
-              className="w-full px-4 py-4 border border-gray-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#00c878]/20 focus:border-[#00c878] resize-none"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+              className="w-full px-4 py-4 border border-gray-200 rounded-2xl bg-white"
+              style={{ minHeight: 120 }}
             />
-          </div>
+          </View>
 
-          <div>
-            <label className="block text-gray-700 mb-3">Attach Image (Optional)</label>
-            <button className="w-full p-6 border-2 border-dashed border-gray-300 rounded-2xl flex flex-col items-center gap-3 hover:border-[#00c878] transition-colors">
-              <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
-                <Image className="w-6 h-6 text-gray-400" />
-              </div>
-              <div className="text-center">
-                <p className="text-gray-600">Tap to upload image</p>
-                <p className="text-gray-400">JPG, PNG (Max 5MB)</p>
-              </div>
-            </button>
-          </div>
+          {/* Image Upload */}
+          <View>
+            <Text className="text-gray-700 mb-3 font-medium">Attach Image (Optional)</Text>
+            <TouchableOpacity className="w-full p-6 border-2 border-dashed border-gray-300 rounded-2xl items-center" style={{ gap: 12 }}>
+              <View className="w-12 h-12 rounded-full bg-gray-100 items-center justify-center">
+                <ImageIcon size={24} color="#9CA3AF" />
+              </View>
+              <View className="items-center">
+                <Text className="text-gray-600">Tap to upload image</Text>
+                <Text className="text-gray-400 text-sm">JPG, PNG (Max 5MB)</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
 
-          <button
-            onClick={handleSubmit}
-            className="w-full py-4 rounded-2xl text-white"
-            style={{
-              background: 'linear-gradient(135deg, #00c878 0%, #00e68a 100%)'
-            }}
-          >
-            Submit Complaint
-          </button>
-        </div>
-      </div>
-    </div>
+          {/* Submit Button */}
+          <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#00c878', '#00e68a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              className="w-full py-4 rounded-2xl items-center"
+            >
+              <Text className="text-white font-semibold text-base">Submit Complaint</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, Image, Platform, Modal, Alert, TouchableWithoutFeedback, KeyboardAvoidingView } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, FlatList, TouchableWithoutFeedback, Dimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ArrowLeft, Send, Paperclip, X, MoreVertical, Search } from 'lucide-react-native';
@@ -625,3 +625,7 @@ export default function CommunityChat() {
         </SafeAreaView >
     );
 }
+
+
+
+

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, TouchableWithoutFeedback } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, TouchableWithoutFeedback } from 'react-native';
 import { CheckCircle, XCircle } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -58,3 +58,7 @@ export default function StatusModal({ visible, type, title, message, onClose }: 
         </Modal>
     );
 }
+
+
+
+

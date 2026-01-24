@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { View, Text, TouchableOpacity, TextInput, FlatList, Image, KeyboardAvoidingView, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, Send, Paperclip, X } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -437,3 +437,7 @@ export default function PrivateChatDetail() {
         </SafeAreaView>
     );
 }
+
+
+
+

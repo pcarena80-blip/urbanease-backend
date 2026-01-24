@@ -1,10 +1,12 @@
+import { View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useState } from 'react';
-import { ArrowLeft, Send, Paperclip } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-export default function ChatDetail({ 
-  chat, 
-  onNavigate 
-}: { 
+export default function ChatDetail({
+  chat,
+  onNavigate
+}: {
   chat: any;
   onNavigate: (screen: string) => void;
 }) {
@@ -27,84 +29,85 @@ export default function ChatDetail({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white">
+    <View className="flex-1 bg-white">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100" style={{
-        background: 'linear-gradient(90deg, #003E2F 0%, #027A4C 100%)'
-      }}>
-        <div className="flex items-center gap-4">
-          <button onClick={() => onNavigate('private-chat')}>
-            <ArrowLeft className="w-6 h-6 text-white" strokeWidth={1.5} />
-          </button>
-          <div 
-            className="w-10 h-10 rounded-full flex items-center justify-center text-white"
-            style={{ background: 'rgba(255, 255, 255, 0.2)' }}
+      <LinearGradient
+        colors={['#003E2F', '#027A4C']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        className="px-6 py-4"
+      >
+        <View className="flex-row items-center" style={{ gap: 16 }}>
+          <TouchableOpacity onPress={() => onNavigate('private-chat')}>
+            <ArrowLeft size={24} color="white" strokeWidth={1.5} />
+          </TouchableOpacity>
+          <View
+            className="w-10 h-10 rounded-full items-center justify-center"
+            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
           >
-            <span style={{ fontSize: '14px', fontWeight: 600 }}>
+            <Text className="text-white text-sm font-semibold">
               {chat.avatar}
-            </span>
-          </div>
-          <div className="flex-1">
-            <h2 className="text-white" style={{ fontSize: '18px', fontWeight: 600 }}>
+            </Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-white text-lg font-semibold">
               {chat.name}
-            </h2>
-            <p className="text-white/80" style={{ fontSize: '12px' }}>
+            </Text>
+            <Text className="text-white/80 text-xs">
               {chat.online ? 'Online' : 'Offline'}
-            </p>
-          </div>
-        </div>
-      </div>
+            </Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4 pb-24">
+      <ScrollView className="flex-1 px-6 py-6" contentContainerStyle={{ gap: 16 }}>
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[75%] ${msg.sender === 'user' ? 'flex flex-col items-end' : ''}`}>
-              <div
-                className={`p-3.5 ${
-                  msg.sender === 'user'
-                    ? 'rounded-2xl rounded-tr-sm'
+          <View key={msg.id} className={`flex-row ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <View className={`max-w-[75%] ${msg.sender === 'user' ? 'items-end' : 'items-start'}`}>
+              <View
+                className={`p-3.5 ${msg.sender === 'user'
+                    ? 'bg-[#F1F8F4] rounded-2xl rounded-tr-sm'
                     : 'bg-gray-100 rounded-2xl rounded-tl-sm'
-                }`}
-                style={{
-                  background: msg.sender === 'user' ? '#F1F8F4' : '#F5F5F5',
-                  color: msg.sender === 'user' ? '#027A4C' : '#1F2937'
-                }}
+                  }`}
               >
-                <p style={{ fontSize: '14px' }}>{msg.message}</p>
-              </div>
-              <p className="text-gray-400 mt-1" style={{ fontSize: '11px' }}>
+                <Text className={`text-sm ${msg.sender === 'user' ? 'text-[#027A4C]' : 'text-gray-800'}`}>
+                  {msg.message}
+                </Text>
+              </View>
+              <Text className="text-gray-400 text-[11px] mt-1">
                 {msg.time}
-              </p>
-            </div>
-          </div>
+              </Text>
+            </View>
+          </View>
         ))}
-      </div>
+      </ScrollView>
 
       {/* Input Bar */}
-      <div className="bg-white border-t border-gray-100 p-4 pb-24">
-        <div className="flex items-center gap-3">
-          <button className="text-gray-400">
-            <Paperclip className="w-5 h-5" strokeWidth={1.5} />
-          </button>
-          <input
-            type="text"
+      <View className="bg-white border-t border-gray-100 p-4 pb-8">
+        <View className="flex-row items-center" style={{ gap: 12 }}>
+          <TouchableOpacity>
+            <Paperclip size={20} color="#9CA3AF" strokeWidth={1.5} />
+          </TouchableOpacity>
+          <TextInput
             value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onChangeText={setMessageText}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-3 bg-gray-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#027A4C]/20"
-            style={{ fontSize: '14px' }}
+            placeholderTextColor="#9CA3AF"
+            className="flex-1 px-4 py-3 bg-gray-100 rounded-xl text-sm"
           />
-          <button
-            onClick={handleSend}
-            className="w-11 h-11 rounded-xl flex items-center justify-center"
-            style={{ background: 'linear-gradient(90deg, #003E2F 0%, #027A4C 100%)' }}
-          >
-            <Send className="w-5 h-5 text-white" strokeWidth={1.5} />
-          </button>
-        </div>
-      </div>
-    </div>
+          <TouchableOpacity onPress={handleSend} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#003E2F', '#027A4C']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              className="w-11 h-11 rounded-xl items-center justify-center"
+            >
+              <Send size={20} color="white" strokeWidth={1.5} />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
 }

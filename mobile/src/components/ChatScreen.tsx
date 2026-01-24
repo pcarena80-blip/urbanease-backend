@@ -1,5 +1,7 @@
+import { View, Text, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 import { useState } from 'react';
-import { ArrowLeft, Send, Paperclip, Smile, User } from 'lucide-react';
+import { ArrowLeft, Send, Paperclip, Smile } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const messages = [
   { id: 1, sender: 'admin', name: 'Admin', message: 'Welcome to Green Valley Community Chat!', time: '10:00 AM', avatar: 'A' },
@@ -21,79 +23,84 @@ export default function ChatScreen({ onNavigate }: { onNavigate: (screen: string
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
+    <View className="flex-1 bg-gray-50">
       {/* Header */}
-      <div className="p-6 pb-4" style={{
-        background: 'linear-gradient(135deg, #00c878 0%, #00e68a 100%)'
-      }}>
-        <div className="flex items-center gap-4">
-          <button onClick={() => onNavigate('home')} className="text-white">
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <div className="flex-1">
-            <h1 className="text-white mb-1">Community Chat</h1>
-            <p className="text-white/90">256 members</p>
-          </div>
-        </div>
-      </div>
+      <LinearGradient
+        colors={['#00c878', '#00e68a']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        className="p-6 pb-4"
+      >
+        <View className="flex-row items-center" style={{ gap: 16 }}>
+          <TouchableOpacity onPress={() => onNavigate('home')}>
+            <ArrowLeft size={24} color="white" />
+          </TouchableOpacity>
+          <View className="flex-1">
+            <Text className="text-white text-lg font-semibold mb-1">Community Chat</Text>
+            <Text className="text-white/90 text-sm">256 members</Text>
+          </View>
+        </View>
+      </LinearGradient>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-6 py-6 pb-4 space-y-4">
+      <ScrollView className="flex-1 px-6 py-6" contentContainerStyle={{ gap: 16 }}>
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-3 ${msg.sender === 'admin' ? 'justify-center' : ''}`}>
+          <View key={msg.id} className={`flex-row ${msg.sender === 'admin' ? 'justify-center' : ''}`} style={{ gap: 12 }}>
             {msg.sender !== 'admin' && (
-              <div className="w-10 h-10 rounded-full bg-[#00c878] flex items-center justify-center text-white flex-shrink-0">
-                {msg.avatar}
-              </div>
+              <View className="w-10 h-10 rounded-full bg-[#00c878] items-center justify-center">
+                <Text className="text-white text-sm font-semibold">{msg.avatar}</Text>
+              </View>
             )}
-            <div className={`flex-1 ${msg.sender === 'admin' ? 'max-w-xs' : 'max-w-[75%]'}`}>
+            <View className={`flex-1 ${msg.sender === 'admin' ? 'max-w-[80%]' : 'max-w-[75%]'}`}>
               {msg.sender !== 'admin' && (
-                <p className="text-gray-600 mb-1">{msg.name}</p>
+                <Text className="text-gray-600 text-sm mb-1">{msg.name}</Text>
               )}
-              <div
+              <View
                 className={`p-4 rounded-3xl ${msg.sender === 'admin'
-                    ? 'bg-gray-200 text-gray-700 text-center'
-                    : msg.name === 'Zainab Bibi'
-                      ? 'bg-[#00c878] text-white rounded-tl-md'
-                      : 'bg-white text-gray-900 rounded-tl-md'
+                  ? 'bg-gray-200'
+                  : msg.name === 'Zainab Bibi'
+                    ? 'bg-[#00c878] rounded-tl-md'
+                    : 'bg-white rounded-tl-md'
                   }`}
               >
-                <p>{msg.message}</p>
-              </div>
-              <p className="text-gray-400 mt-1">{msg.time}</p>
-            </div>
-          </div>
+                <Text className={`${msg.sender === 'admin' ? 'text-gray-700 text-center' : msg.name === 'Zainab Bibi' ? 'text-white' : 'text-gray-900'}`}>
+                  {msg.message}
+                </Text>
+              </View>
+              <Text className="text-gray-400 text-xs mt-1">{msg.time}</Text>
+            </View>
+          </View>
         ))}
-      </div>
+      </ScrollView>
 
       {/* Input Bar */}
-      <div className="bg-white border-t border-gray-200 p-4 pb-24">
-        <div className="flex items-center gap-3">
-          <button className="text-gray-400">
-            <Paperclip className="w-6 h-6" />
-          </button>
-          <input
-            type="text"
+      <View className="bg-white border-t border-gray-200 p-4 pb-8">
+        <View className="flex-row items-center" style={{ gap: 12 }}>
+          <TouchableOpacity>
+            <Paperclip size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+          <TextInput
             value={messageText}
-            onChange={(e) => setMessageText(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+            onChangeText={setMessageText}
             placeholder="Type a message..."
-            className="flex-1 px-4 py-3 bg-gray-100 rounded-full focus:outline-none focus:ring-2 focus:ring-[#00c878]/20"
+            placeholderTextColor="#9CA3AF"
+            className="flex-1 px-4 py-3 bg-gray-100 rounded-full"
           />
-          <button className="text-gray-400">
-            <Smile className="w-6 h-6" />
-          </button>
-          <button
-            onClick={handleSend}
-            className="w-12 h-12 rounded-full flex items-center justify-center"
-            style={{
-              background: 'linear-gradient(135deg, #00c878 0%, #00e68a 100%)'
-            }}
-          >
-            <Send className="w-5 h-5 text-white" />
-          </button>
-        </div>
-      </div>
-    </div>
+          <TouchableOpacity>
+            <Smile size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleSend} activeOpacity={0.8}>
+            <LinearGradient
+              colors={['#00c878', '#00e68a']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              className="w-12 h-12 rounded-full items-center justify-center"
+            >
+              <Send size={20} color="white" />
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
   );
 }

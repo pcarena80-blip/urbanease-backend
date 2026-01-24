@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { ArrowLeft } from 'lucide-react-native';
 
@@ -27,3 +27,7 @@ export const ComplaintsScreen = () => <PlaceholderScreen title="Complaints Cente
 export const NoticesScreen = () => <PlaceholderScreen title="Notice Board" />;
 export const ChatScreen = () => <PlaceholderScreen title="Community Chat" />;
 export const ProfileScreen = () => <PlaceholderScreen title="My Profile" />;
+
+
+
+
