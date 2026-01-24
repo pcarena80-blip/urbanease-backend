@@ -33,7 +33,7 @@ export default function CommunityChat() {
         loadMessages();
         loadUnreadCount();
         // Reduced polling interval for better performance
-        const interval = setInterval(loadMessages, 10000); // 10 seconds instead of 5
+        const interval = setInterval(loadMessages, 30000); // 30 seconds for performance
         return () => {
             clearInterval(interval);
             markAsRead(); // Mark as read when leaving
