@@ -107,7 +107,6 @@ export default function NoticesScreen() {
             return (
               <TouchableOpacity
                 key={notice._id || index}
-                key={notice._id}
                 onPress={() => navigation.navigate('NoticeDetails', { notice })}
                 className="bg-white rounded-2xl p-5 shadow-sm mb-4"
                 activeOpacity={0.7}

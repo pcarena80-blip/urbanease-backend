@@ -4,7 +4,10 @@ const Notice = require('../models/Notice');
 // @route   GET /api/notices
 const getNotices = async (req, res) => {
     try {
-        const notices = await Notice.find().sort({ createdAt: -1 });
+        // Only return notices that haven't expired
+        const notices = await Notice.find({
+            expiryDate: { $gte: new Date() }
+        }).sort({ createdAt: -1 });
         res.json(notices);
     } catch (error) {
         console.error('Error fetching notices:', error);
