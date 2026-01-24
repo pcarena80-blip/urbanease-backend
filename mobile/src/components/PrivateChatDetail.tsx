@@ -55,8 +55,8 @@ export default function PrivateChatDetail() {
 
         setupSocket();
 
-        // Polling fallback (every 30s for performance)
-        const interval = setInterval(loadMessages, 30000);
+        // Polling fallback (every 10s)
+        const interval = setInterval(loadMessages, 10000);
 
         return () => {
             clearInterval(interval);
@@ -348,9 +348,11 @@ export default function PrivateChatDetail() {
                         renderItem={renderItem}
                         contentContainerStyle={{ paddingVertical: 24, paddingBottom: 24, flexGrow: 1 }}
                         className="flex-1 bg-gray-50"
-                        initialScrollIndex={messages.length > 0 ? messages.length - 1 : undefined}
-                        getItemLayout={(data, index) => ({ length: 80, offset: 80 * index, index })}
-                        maintainVisibleContentPosition={{ minIndexForVisible: 0 }}
+                        onContentSizeChange={() => {
+                            if (messages.length > 0) {
+                                flatListRef.current?.scrollToEnd({ animated: false });
+                            }
+                        }}
                         ListEmptyComponent={
                             <View className="flex-1 items-center justify-center py-20">
                                 {isLoading ? (
