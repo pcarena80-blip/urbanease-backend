@@ -20,9 +20,15 @@ const getMessages = async (req, res) => {
         };
     }
 
+    // Limit to last 100 messages for performance, use lean() for speed
     const messages = await ChatMessage.find(query)
-        .sort({ timestamp: 1 })
-        .populate('senderId', 'name email');
+        .sort({ timestamp: -1 })
+        .limit(100)
+        .populate('senderId', 'name email')
+        .lean();
+
+    // Reverse to show oldest first
+    messages.reverse();
 
     const formattedMessages = messages.map(msg => {
         // Handle orphaned messages (sender deleted)
@@ -139,48 +145,67 @@ const getInbox = async (req, res) => {
     try {
         const myId = req.user.id;
 
-        // Find all messages where I am sender OR receiver
-        // We only want private chats, so exclude receiverId="community" if that's how it's stored
-        const messages = await ChatMessage.find({
-            $or: [{ senderId: myId }, { receiverId: myId }]
-        }).sort({ timestamp: -1 });
+        // Use aggregation for much better performance
+        const pipeline = [
+            // Match messages involving current user (excluding community)
+            {
+                $match: {
+                    $or: [
+                        { senderId: new require('mongoose').Types.ObjectId(myId) },
+                        { receiverId: myId }
+                    ],
+                    receiverId: { $ne: 'community' }
+                }
+            },
+            // Sort by newest first
+            { $sort: { timestamp: -1 } },
+            // Group by conversation partner
+            {
+                $group: {
+                    _id: {
+                        $cond: [
+                            { $eq: [{ $toString: '$senderId' }, myId] },
+                            '$receiverId',
+                            { $toString: '$senderId' }
+                        ]
+                    },
+                    lastMessage: { $first: '$message' },
+                    attachment: { $first: '$attachment' },
+                    timestamp: { $first: '$timestamp' }
+                }
+            },
+            // Limit to 50 conversations
+            { $limit: 50 }
+        ];
 
-        const contactMap = new Map();
+        const conversations = await ChatMessage.aggregate(pipeline);
 
-        for (const msg of messages) {
-            // Determine the "other" person
-            let otherId = msg.senderId.toString() === myId ? msg.receiverId : msg.senderId.toString();
+        // Batch load all users at once (instead of N individual queries)
+        const userIds = conversations
+            .map(c => c._id)
+            .filter(id => id && id !== 'community' && /^[a-f\d]{24}$/i.test(id));
 
-            if (otherId === 'community') continue;
+        const users = await User.find({ _id: { $in: userIds } })
+            .select('name email')
+            .lean();
 
-            // If we haven't seen this person yet, add them
-            if (!contactMap.has(otherId)) {
-                contactMap.set(otherId, {
-                    lastMessage: msg.message || (msg.attachment ? 'Attachment' : ''),
-                    timestamp: msg.timestamp,
-                    otherId
-                });
-            }
-        }
+        const userMap = new Map(users.map(u => [u._id.toString(), u]));
 
-        const contacts = [];
-        for (const [id, data] of contactMap) {
-            // Populate user details for this ID
-            // Assuming receiverId is stored as User ObjectId string in database for private chats
-            const user = await User.findById(id).select('name email');
-            if (user) {
+        const contacts = conversations
+            .filter(c => userMap.has(c._id))
+            .map(c => {
+                const user = userMap.get(c._id);
                 const initials = user.name ? user.name.split(' ').map(n => n[0]).join('').toUpperCase() : '??';
-                contacts.push({
+                return {
                     id: user._id,
                     name: user.name,
                     avatar: initials,
-                    lastMessage: data.lastMessage,
-                    time: new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-                    timestamp: data.timestamp, // for sorting if needed
-                    online: false // Placeholder for online status
-                });
-            }
-        }
+                    lastMessage: c.lastMessage || (c.attachment ? 'Attachment' : ''),
+                    time: new Date(c.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    timestamp: c.timestamp,
+                    online: false
+                };
+            });
 
         res.status(200).json(contacts);
     } catch (error) {
