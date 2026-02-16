@@ -10,6 +10,7 @@ router.get('/unread', protect, requestChatCenter);
 router.post('/read/:chatId', protect, markAsRead);
 
 router.get('/inbox', protect, require('../controllers/chatController').getInbox);
+router.get('/reports', protect, require('../controllers/chatController').getReportedMessages); // Must be before /:userId
 router.get('/:userId', protect, displayChatWindow);
 router.post('/', protect, upload.single('file'), deliverMessage);
 router.delete('/:id', protect, require('../controllers/chatController').deleteMessage);

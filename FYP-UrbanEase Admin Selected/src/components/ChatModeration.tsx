@@ -35,20 +35,47 @@ export function ChatModeration() {
 
   const fetchMessages = async () => {
     try {
-      const response = await api.get('/chat/community');
+      const [communityResponse, reportsResponse] = await Promise.all([
+        api.get('/chat/community'),
+        api.get('/chat/reports')
+      ]);
 
       // Map backend response to component format
-      const formattedMessages = response.data.map((msg: any) => ({
+      const communityMessages = communityResponse.data.map((msg: any) => ({
         id: msg.id,
         user: msg.name || 'Unknown User',
         message: msg.message || '',
         time: msg.time,
-        flagged: false, // Backend doesn't support flagging yet
+        flagged: false,
         senderId: msg.senderId,
         attachment: msg.attachment || null,
         attachmentType: msg.attachmentType || null,
+        rawTime: msg.timestamp // Keep raw timestamp for sorting
       }));
-      setMessages(formattedMessages);
+
+      const reportedMessages = reportsResponse.data.map((msg: any) => ({
+        id: msg.id,
+        user: msg.name || 'Unknown User',
+        message: msg.message || '',
+        time: msg.time,
+        flagged: true, // Explicitly flagged
+        senderId: msg.senderId,
+        attachment: msg.attachment || null,
+        attachmentType: msg.attachmentType || null,
+        rawTime: msg.timestamp
+      }));
+
+      // Merge and De-duplicate (Reports take precedence for 'flagged' status)
+      const messageMap = new Map();
+
+      communityMessages.forEach((msg: any) => messageMap.set(msg.id, msg));
+      reportedMessages.forEach((msg: any) => messageMap.set(msg.id, msg));
+
+      const mergedMessages = Array.from(messageMap.values()).sort((a: any, b: any) => {
+        return new Date(b.rawTime).getTime() - new Date(a.rawTime).getTime();
+      });
+
+      setMessages(mergedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast.error('Failed to load messages');
