@@ -255,6 +255,13 @@ export const api = {
                 method: 'POST',
                 headers: await getHeaders()
             });
+        },
+        reportMessage: async (messageId, reason, description = '') => {
+            return request('/chat/report', {
+                method: 'POST',
+                headers: await getHeaders(),
+                body: JSON.stringify({ messageId, reason, description })
+            });
         }
     },
     notices: {

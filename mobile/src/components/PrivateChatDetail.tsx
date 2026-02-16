@@ -234,6 +234,46 @@ export default function PrivateChatDetail() {
         }
     };
 
+    const handleReportMessage = (msg: any) => {
+        Alert.alert(
+            'Report Message',
+            'Why are you reporting this message?',
+            [
+                {
+                    text: 'Inappropriate',
+                    onPress: () => submitReport(msg, 'inappropriate')
+                },
+                {
+                    text: 'Spam',
+                    onPress: () => submitReport(msg, 'spam')
+                },
+                {
+                    text: 'Harassment',
+                    onPress: () => submitReport(msg, 'harassment')
+                },
+                {
+                    text: 'Other',
+                    onPress: () => submitReport(msg, 'other')
+                },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
+    };
+
+    const submitReport = async (msg: any, reason: string) => {
+        try {
+            await api.chat.reportMessage(msg.id || msg._id, reason);
+            Alert.alert('Reported', 'This message has been reported. Our team will review it.');
+        } catch (error: any) {
+            const errMsg = error?.message || 'Failed to report message';
+            if (errMsg.includes('already reported')) {
+                Alert.alert('Already Reported', 'You have already reported this message.');
+            } else {
+                Alert.alert('Error', errMsg);
+            }
+        }
+    };
+
     const renderItem = ({ item: msg }: { item: any }) => {
         if (!msg) return null;
 
@@ -241,50 +281,64 @@ export default function PrivateChatDetail() {
         const hasMessage = msg.message && msg.message.trim().length > 0;
         const hasImage = msg.attachment && msg.attachmentType === 'image';
 
+        const messageBubble = (
+            <View className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
+                {/* Image Message */}
+                {hasImage && (
+                    <TouchableOpacity
+                        onPress={() => setViewerImage(api.getImageUrl(msg.attachment))}
+                        activeOpacity={0.9}
+                        style={{ marginBottom: hasMessage ? 8 : 0 }}
+                    >
+                        <Image
+                            source={{ uri: api.getImageUrl(msg.attachment) }}
+                            style={{
+                                width: 200,
+                                height: 150,
+                                borderRadius: 12,
+                                backgroundColor: '#f0f0f0',
+                                borderWidth: 1,
+                                borderColor: '#e0e0e0'
+                            }}
+                            resizeMode="cover"
+                        />
+                    </TouchableOpacity>
+                )}
+
+                {/* Text Message */}
+                {hasMessage && (
+                    <View
+                        className={`p-3.5 ${isMe
+                            ? 'bg-[#F1F8F4] rounded-2xl rounded-tr-sm'
+                            : 'bg-white rounded-2xl rounded-tl-sm'
+                            }`}
+                    >
+                        <Text className={`${isMe ? 'text-[#027A4C]' : 'text-gray-900'} text-sm`}>
+                            {msg.message}
+                        </Text>
+                    </View>
+                )}
+
+                {/* Timestamp */}
+                <Text className="text-gray-400 mt-1 text-[11px]">
+                    {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </Text>
+            </View>
+        );
+
         return (
             <View className={`flex-row mb-4 ${isMe ? 'justify-end' : 'justify-start'} px-6`}>
-                <View className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                    {/* Image Message */}
-                    {hasImage && (
-                        <TouchableOpacity
-                            onPress={() => setViewerImage(api.getImageUrl(msg.attachment))}
-                            activeOpacity={0.9}
-                            style={{ marginBottom: hasMessage ? 8 : 0 }}
-                        >
-                            <Image
-                                source={{ uri: api.getImageUrl(msg.attachment) }}
-                                style={{
-                                    width: 200,
-                                    height: 150,
-                                    borderRadius: 12,
-                                    backgroundColor: '#f0f0f0',
-                                    borderWidth: 1,
-                                    borderColor: '#e0e0e0'
-                                }}
-                                resizeMode="cover"
-                            />
-                        </TouchableOpacity>
-                    )}
-
-                    {/* Text Message */}
-                    {hasMessage && (
-                        <View
-                            className={`p-3.5 ${isMe
-                                ? 'bg-[#F1F8F4] rounded-2xl rounded-tr-sm'
-                                : 'bg-white rounded-2xl rounded-tl-sm'
-                                }`}
-                        >
-                            <Text className={`${isMe ? 'text-[#027A4C]' : 'text-gray-900'} text-sm`}>
-                                {msg.message}
-                            </Text>
-                        </View>
-                    )}
-
-                    {/* Timestamp */}
-                    <Text className="text-gray-400 mt-1 text-[11px]">
-                        {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </Text>
-                </View>
+                {isMe ? (
+                    messageBubble
+                ) : (
+                    <TouchableOpacity
+                        activeOpacity={0.7}
+                        onLongPress={() => handleReportMessage(msg)}
+                        delayLongPress={500}
+                    >
+                        {messageBubble}
+                    </TouchableOpacity>
+                )}
             </View>
         )
     };

@@ -14,5 +14,50 @@ router.get('/:userId', protect, displayChatWindow);
 router.post('/', protect, upload.single('file'), deliverMessage);
 router.delete('/:id', protect, require('../controllers/chatController').deleteMessage);
 
+// Report a message
+const MessageReport = require('../models/MessageReport');
+const ChatMessage = require('../models/ChatMessage');
+router.post('/report', protect, async (req, res) => {
+    try {
+        const { messageId, reason, description } = req.body;
+        const reporterId = req.user._id;
+
+        if (!messageId || !reason) {
+            return res.status(400).json({ message: 'messageId and reason are required' });
+        }
+
+        // Verify the message exists
+        const message = await ChatMessage.findById(messageId);
+        if (!message) {
+            return res.status(404).json({ message: 'Message not found' });
+        }
+
+        // Cannot report your own message
+        if (message.senderId.toString() === reporterId.toString()) {
+            return res.status(400).json({ message: 'Cannot report your own message' });
+        }
+
+        // Check for duplicate report
+        const existing = await MessageReport.findOne({ reporterId, messageId });
+        if (existing) {
+            return res.status(409).json({ message: 'You have already reported this message' });
+        }
+
+        const report = await MessageReport.create({
+            reporterId,
+            reportedUserId: message.senderId,
+            messageId,
+            messageContent: message.message || '',
+            reason,
+            description: description || ''
+        });
+
+        res.status(201).json({ message: 'Message reported successfully', reportId: report._id });
+    } catch (error) {
+        console.error('Report message error:', error);
+        res.status(500).json({ message: 'Failed to report message' });
+    }
+});
+
 module.exports = router;
 
