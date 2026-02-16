@@ -268,10 +268,20 @@ router.get('/stats/graphs', protect, adminMiddleware, async (req, res) => {
 
 // NOTICE ROUTES
 
-// Get all notices
+// Get active (non-expired) notices
 router.get('/notices', protect, adminMiddleware, async (req, res) => {
     try {
-        const notices = await Notice.find().sort({ createdAt: -1 });
+        const notices = await Notice.find({ expiryDate: { $gte: new Date() } }).sort({ createdAt: -1 });
+        res.json(notices);
+    } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Get expired notices (history)
+router.get('/notices/history', protect, adminMiddleware, async (req, res) => {
+    try {
+        const notices = await Notice.find({ expiryDate: { $lt: new Date() } }).sort({ expiryDate: -1 });
         res.json(notices);
     } catch (error) {
         res.status(500).json({ message: 'Server error' });
@@ -279,13 +289,15 @@ router.get('/notices', protect, adminMiddleware, async (req, res) => {
 });
 
 // Create notice
-router.post('/notices', protect, adminMiddleware, async (req, res) => {
+const upload = require('../middleware/uploadMiddleware');
+router.post('/notices', protect, adminMiddleware, upload.single('file'), async (req, res) => {
     try {
         const { title, description, expiryDate } = req.body;
         const notice = await Notice.create({
             title,
             description,
-            expiryDate
+            expiryDate,
+            attachment: req.file ? `uploads/${req.file.filename}` : null
         });
 
         // Notify users via Socket.IO
