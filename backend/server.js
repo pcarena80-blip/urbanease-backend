@@ -35,8 +35,17 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 //     next();
 // });
 
-// Serve static files (uploads) with aggressive caching
-app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+// Serve static files (uploads) - serve from BOTH possible directories
+const uploadsPath1 = path.join(__dirname, 'uploads');
+const uploadsPath2 = path.join(__dirname, '..', 'uploads');
+console.log('📂 Static uploads path 1:', uploadsPath1);
+console.log('📂 Static uploads path 2:', uploadsPath2);
+app.use('/uploads', express.static(uploadsPath1, {
+    maxAge: '7d',
+    etag: true,
+    lastModified: true
+}));
+app.use('/uploads', express.static(uploadsPath2, {
     maxAge: '7d',
     etag: true,
     lastModified: true
