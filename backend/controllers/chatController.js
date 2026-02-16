@@ -332,8 +332,8 @@ const markAsRead = async (req, res) => {
 };
 
 module.exports = {
-    getMessages,
-    sendMessage,
+    displayChatWindow: getMessages,
+    deliverMessage: sendMessage,
     getInbox,
     deleteMessage,
     getReportedMessages,
