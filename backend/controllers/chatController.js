@@ -277,10 +277,66 @@ const getReportedMessages = async (req, res) => {
     }
 };
 
+// @desc    Get unread counts
+// @route   GET /api/chat/unread
+// @access  Private
+const requestChatCenter = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const user = await User.findById(userId);
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Count unread community messages
+        const communityUnreadCount = await ChatMessage.countDocuments({
+            receiverId: 'community',
+            timestamp: { $gt: user.lastCommunityRead || new Date(0) }
+        });
+
+        // For private chats, we'd need a lastRead map. Stubbing to 0 for now to fix crash.
+        // TODO: Implement per-chat read status
+
+        res.status(200).json({
+            community: communityUnreadCount,
+            private: 0 // Placeholder
+        });
+    } catch (error) {
+        console.error('Request Chat Center Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
+// @desc    Mark chat as read
+// @route   POST /api/chat/read/:chatId
+// @access  Private
+const markAsRead = async (req, res) => {
+    try {
+        const { chatId } = req.params;
+        const userId = req.user.id;
+
+        if (chatId === 'community') {
+            await User.findByIdAndUpdate(userId, {
+                lastCommunityRead: new Date()
+            });
+        }
+
+        // For private chats, add logic here when schema supports it
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Mark As Read Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     getMessages,
     sendMessage,
     getInbox,
     deleteMessage,
-    getReportedMessages
+    getReportedMessages,
+    requestChatCenter,
+    markAsRead
 };
