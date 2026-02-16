@@ -13,6 +13,9 @@ const noticeSchema = mongoose.Schema({
         type: Date,
         required: true,
     },
+    attachment: {
+        type: String,
+    },
 }, {
     timestamps: true,
 });

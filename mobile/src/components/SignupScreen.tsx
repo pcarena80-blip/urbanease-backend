@@ -330,6 +330,22 @@ export default function SignupScreen() {
       return;
     }
 
+    // Block/Street/House validation (only for house property type)
+    if (formData.propertyType === 'house') {
+      if (!formData.block || !/^[A-Z]$/.test(formData.block)) {
+        Alert.alert('Error', 'Block / Sector must be a single letter (A-Z)');
+        return;
+      }
+      if (!formData.street || !/^\d{1,3}$/.test(formData.street)) {
+        Alert.alert('Error', 'Street must be a number (1-3 digits)');
+        return;
+      }
+      if (!formData.houseNo || !/^\d{1,3}$/.test(formData.houseNo)) {
+        Alert.alert('Error', 'House number must be a number (1-3 digits)');
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       await api.auth.signup(formData);
@@ -566,15 +582,48 @@ export default function SignupScreen() {
                     <View className="flex-row gap-3">
                       <View className="flex-1">
                         <Text className="text-gray-700 mb-2 text-xs font-medium">Block / Sector</Text>
-                        <TextInput value={formData.block} onChangeText={text => setFormData({ ...formData, block: text })} placeholder="B / S" className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                        <TextInput
+                          value={formData.block}
+                          onChangeText={text => {
+                            const letter = text.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1);
+                            setFormData({ ...formData, block: letter });
+                          }}
+                          placeholder="A"
+                          maxLength={1}
+                          autoCapitalize="characters"
+                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
+                          style={{ fontSize: 14 }}
+                        />
                       </View>
                       <View className="flex-1">
                         <Text className="text-gray-700 mb-2 text-xs font-medium">Street</Text>
-                        <TextInput value={formData.street} onChangeText={text => setFormData({ ...formData, street: text })} placeholder="Street" className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                        <TextInput
+                          value={formData.street}
+                          onChangeText={text => {
+                            const digits = text.replace(/\D/g, '').slice(0, 3);
+                            setFormData({ ...formData, street: digits });
+                          }}
+                          placeholder="1"
+                          maxLength={3}
+                          keyboardType="number-pad"
+                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
+                          style={{ fontSize: 14 }}
+                        />
                       </View>
                       <View className="flex-1">
                         <Text className="text-gray-700 mb-2 text-xs font-medium">House</Text>
-                        <TextInput value={formData.houseNo} onChangeText={text => setFormData({ ...formData, houseNo: text })} placeholder="No." className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                        <TextInput
+                          value={formData.houseNo}
+                          onChangeText={text => {
+                            const digits = text.replace(/\D/g, '').slice(0, 3);
+                            setFormData({ ...formData, houseNo: digits });
+                          }}
+                          placeholder="1"
+                          maxLength={3}
+                          keyboardType="number-pad"
+                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
+                          style={{ fontSize: 14 }}
+                        />
                       </View>
                     </View>
                   ) : (

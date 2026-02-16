@@ -262,6 +262,26 @@ export const api = {
                 headers: await getHeaders(),
                 body: JSON.stringify({ messageId, reason, description })
             });
+        },
+        sendRequest: async (receiverId) => {
+            return request('/chat/request', {
+                method: 'POST',
+                headers: await getHeaders(),
+                body: JSON.stringify({ receiverId })
+            });
+        },
+        getRequests: async () => {
+            return request('/chat/requests', { headers: await getHeaders() });
+        },
+        respondToRequest: async (requestId, status) => {
+            return request(`/chat/request/${requestId}`, {
+                method: 'PUT',
+                headers: await getHeaders(),
+                body: JSON.stringify({ status })
+            });
+        },
+        getChatStatus: async (userId) => {
+            return request(`/chat/status/${userId}`, { headers: await getHeaders() });
         }
     },
     notices: {

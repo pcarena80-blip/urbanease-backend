@@ -3,12 +3,17 @@ import { Plus, Trash2, Calendar, Clock, History, Bell, AlertCircle, Upload } fro
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 
+// Derive the server root URL from the API base URL (strip /api)
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SERVER_ROOT = API_BASE.replace(/\/api\/?$/, '');
+
 interface Notice {
   _id: string;
   title: string;
   description: string;
   expiryDate: string;
   createdAt: string;
+  attachment?: string;
 }
 
 export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
@@ -110,13 +115,11 @@ export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
       formData.append('expiryDate', expiryDate);
       if (selectedFile) {
         formData.append('file', selectedFile);
+        console.log('Uploading file:', selectedFile.name, selectedFile.size, 'bytes');
       }
 
-      await api.post('/admin/notices', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      const response = await api.post('/admin/notices', formData);
+      console.log('Notice created:', response.data);
 
       setShowForm(false);
       setTitle('');
@@ -126,7 +129,7 @@ export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
       fetchNotices();
     } catch (error: any) {
       console.error("Failed to create notice", error);
-      setFormError(error.response?.data?.message || "Failed to create notice");
+      setFormError(error.response?.data?.message || error.message || "Failed to create notice");
     } finally {
       setSubmitting(false);
     }
@@ -334,22 +337,28 @@ export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
                   <p className={`mb-3 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{notice.description}</p>
 
                   {/* Attachment Image */}
-                  {(notice as any).attachment && (
-                    <div className="mb-3">
-                      <img
-                        src={(notice as any).attachment.startsWith('http')
-                          ? (notice as any).attachment
-                          : `http://localhost:5000/${(notice as any).attachment.replace(/\\/g, '/')}`}
-                        alt="Notice attachment"
-                        className="h-32 rounded-lg object-cover border border-gray-200"
-                        onError={(e) => {
-                          console.error('Image load error:', (e.target as HTMLImageElement).src);
-                          (e.target as HTMLImageElement).src = 'https://via.placeholder.com/400x200?text=Image+Load+Error';
-                        }}
-                      />
-                      <p className="text-xs text-gray-400 mt-1 break-all">Path: {(notice as any).attachment}</p>
-                    </div>
-                  )}
+                  {notice.attachment && (() => {
+                    const imgUrl = notice.attachment.startsWith('http')
+                      ? notice.attachment
+                      : `${SERVER_ROOT}/${notice.attachment.replace(/\\/g, '/')}`;
+                    console.log('Image URL for notice', notice.title, ':', imgUrl);
+                    return (
+                      <div className="mb-3">
+                        <img
+                          src={imgUrl}
+                          alt="Notice attachment"
+                          className="max-h-48 rounded-lg object-cover border border-gray-200"
+                          onError={(e) => {
+                            console.error('Image failed to load:', imgUrl);
+                            const el = e.target as HTMLImageElement;
+                            el.style.border = '2px solid red';
+                            el.style.padding = '8px';
+                            el.alt = `Failed to load: ${imgUrl}`;
+                          }}
+                        />
+                      </div>
+                    );
+                  })()}
 
                   <div className={`flex items-center gap-4 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     <div className="flex items-center gap-2">

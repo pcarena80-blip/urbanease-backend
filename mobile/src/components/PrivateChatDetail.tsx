@@ -235,6 +235,7 @@ export default function PrivateChatDetail() {
     };
 
     const handleReportMessage = (msg: any) => {
+        console.log('📢 REPORT: Long-press detected on message:', msg.id || msg._id, 'isMe:', msg.senderId === user?._id);
         Alert.alert(
             'Report Message',
             'Why are you reporting this message?',

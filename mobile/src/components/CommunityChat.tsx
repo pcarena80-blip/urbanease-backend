@@ -297,15 +297,51 @@ export default function CommunityChat() {
         }
     };
 
-    const startPrivateChat = (otherUser: any) => {
-        setSelectedUser(null);
-        navigation.navigate('PrivateChatDetail', {
-            chat: {
-                id: otherUser.senderId,
-                name: otherUser.name,
-                avatar: otherUser.avatar,
+    const startPrivateChat = async (otherUser: any) => {
+        try {
+            // Check status
+            const response = await api.chat.getChatStatus(otherUser.senderId);
+
+            if (response.status === 'accepted') {
+                setSelectedUser(null);
+                navigation.navigate('PrivateChatDetail', {
+                    chat: {
+                        id: otherUser.senderId,
+                        name: otherUser.name,
+                        avatar: otherUser.avatar,
+                    }
+                });
+            } else if (response.status === 'pending_sent') {
+                Alert.alert('Pending', 'You have already sent a chat request to this user.');
+            } else if (response.status === 'pending_received') {
+                Alert.alert('Request Received', 'This user has sent you a chat request. Go to Private Chats to accept it.');
+                setSelectedUser(null);
+            } else {
+                // status === 'none' or 'rejected'
+                Alert.alert(
+                    'Start Private Chat',
+                    `You need to send a request to chat privately with ${otherUser.name}.`,
+                    [
+                        { text: 'Cancel', style: 'cancel' },
+                        {
+                            text: 'Send Request',
+                            onPress: async () => {
+                                try {
+                                    await api.chat.sendRequest(otherUser.senderId);
+                                    Alert.alert('Success', 'Chat request sent!');
+                                    setSelectedUser(null);
+                                } catch (e: any) {
+                                    Alert.alert('Error', e.message || 'Failed to send request');
+                                }
+                            }
+                        }
+                    ]
+                );
             }
-        });
+        } catch (error) {
+            console.log('Error checking status:', error);
+            Alert.alert('Error', 'Failed to connect to server');
+        }
     };
 
     const renderItem = ({ item: msg }: { item: any }) => (
