@@ -511,6 +511,33 @@ const getChatStatus = async (req, res) => {
     }
 };
 
+// @desc    Delete chat connection (e.g. unfriend)
+// @route   DELETE /api/chat/connection/:userId
+// @access  Private
+const deleteChatConnection = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const targetId = req.params.userId;
+        const ChatRequest = require('../models/ChatRequest');
+
+        const result = await ChatRequest.findOneAndDelete({
+            $or: [
+                { senderId: userId, receiverId: targetId },
+                { senderId: targetId, receiverId: userId }
+            ]
+        });
+
+        if (!result) {
+            return res.status(404).json({ message: 'Connection not found' });
+        }
+
+        res.status(200).json({ message: 'Connection removed' });
+    } catch (error) {
+        console.error('Delete Connection Error:', error);
+        res.status(500).json({ message: 'Server Error' });
+    }
+};
+
 module.exports = {
     displayChatWindow: getMessages,
     deliverMessage: sendMessage,
@@ -522,5 +549,6 @@ module.exports = {
     sendRequest,
     getRequests,
     respondToRequest,
-    getChatStatus
+    getChatStatus,
+    deleteChatConnection
 };

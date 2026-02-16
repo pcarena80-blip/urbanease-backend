@@ -17,6 +17,7 @@ router.post('/request', protect, require('../controllers/chatController').sendRe
 router.get('/requests', protect, require('../controllers/chatController').getRequests);
 router.put('/request/:requestId', protect, require('../controllers/chatController').respondToRequest);
 router.get('/status/:userId', protect, require('../controllers/chatController').getChatStatus);
+router.delete('/connection/:userId', protect, require('../controllers/chatController').deleteChatConnection);
 
 router.get('/:userId', protect, displayChatWindow);
 router.post('/', protect, upload.single('file'), deliverMessage);

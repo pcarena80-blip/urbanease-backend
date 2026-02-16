@@ -282,6 +282,12 @@ export const api = {
         },
         getChatStatus: async (userId) => {
             return request(`/chat/status/${userId}`, { headers: await getHeaders() });
+        },
+        deleteConnection: async (userId) => {
+            return request(`/chat/connection/${userId}`, {
+                method: 'DELETE',
+                headers: await getHeaders()
+            });
         }
     },
     notices: {

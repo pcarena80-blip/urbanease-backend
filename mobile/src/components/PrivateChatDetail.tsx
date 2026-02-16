@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { ArrowLeft, Send, Paperclip, X } from 'lucide-react-native';
+import { ArrowLeft, Send, Paperclip, X, Trash2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { socketService } from '../services/socket';
@@ -171,6 +171,30 @@ export default function PrivateChatDetail() {
         } catch (error) {
             Alert.alert('Error', 'Failed to pick image');
         }
+    };
+
+    const handleDeleteChat = () => {
+        Alert.alert(
+            'Delete Chat',
+            'Are you sure you want to delete this conversation? This will remove the chat request and you will need to request again to chat.',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            setIsLoading(true);
+                            await api.chat.deleteConnection(chat.id);
+                            navigation.navigate('PrivateChat');
+                        } catch (e: any) {
+                            setIsLoading(false);
+                            Alert.alert('Error', e.message || 'Failed to delete chat');
+                        }
+                    }
+                }
+            ]
+        );
     };
 
     if (!chat) return null;
@@ -376,6 +400,9 @@ export default function PrivateChatDetail() {
                                     {chat.online ? 'Online' : 'Offline'}
                                 </Text>
                             </View>
+                            <TouchableOpacity onPress={handleDeleteChat}>
+                                <Trash2 size={24} color="white" strokeWidth={1.5} />
+                            </TouchableOpacity>
                         </View>
                     </LinearGradient>
 
