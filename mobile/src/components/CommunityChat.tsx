@@ -268,6 +268,35 @@ export default function CommunityChat() {
         }
     };
 
+    const handleReportMessage = (msg: any) => {
+        setSelectedMessage(null); // close modal if open
+        Alert.alert(
+            'Report Message',
+            'Why are you reporting this message?',
+            [
+                { text: 'Inappropriate', onPress: () => submitReport(msg, 'inappropriate') },
+                { text: 'Spam', onPress: () => submitReport(msg, 'spam') },
+                { text: 'Harassment', onPress: () => submitReport(msg, 'harassment') },
+                { text: 'Other', onPress: () => submitReport(msg, 'other') },
+                { text: 'Cancel', style: 'cancel' }
+            ]
+        );
+    };
+
+    const submitReport = async (msg: any, reason: string) => {
+        try {
+            await api.chat.reportMessage(msg.id || msg._id, reason);
+            Alert.alert('Reported', 'This message has been reported. Our team will review it.');
+        } catch (error: any) {
+            const errMsg = error?.message || 'Failed to report message';
+            if (errMsg.includes('already reported')) {
+                Alert.alert('Already Reported', 'You have already reported this message.');
+            } else {
+                Alert.alert('Error', errMsg);
+            }
+        }
+    };
+
     const startPrivateChat = (otherUser: any) => {
         setSelectedUser(null);
         navigation.navigate('PrivateChatDetail', {
@@ -328,6 +357,8 @@ export default function CommunityChat() {
                 {msg.message ? (
                     <TouchableOpacity
                         onPress={() => msg.isFailed ? handleRetryMessage(msg) : setSelectedMessage(msg)}
+                        onLongPress={() => msg.sender !== 'user' && msg.sender !== 'admin' ? handleReportMessage(msg) : undefined}
+                        delayLongPress={500}
                         activeOpacity={0.8}
                         className={`p-3.5 ${msg.sender === 'admin'
                             ? 'bg-gray-100 rounded-2xl'
@@ -598,6 +629,16 @@ export default function CommunityChat() {
                                     >
                                         <X size={18} color="#EF4444" strokeWidth={1.5} />
                                         <Text className="flex-1 text-red-600 text-sm font-medium">Delete Message</Text>
+                                    </TouchableOpacity>
+                                )}
+
+                                {selectedMessage?.sender !== 'user' && selectedMessage?.sender !== 'admin' && (
+                                    <TouchableOpacity
+                                        onPress={() => handleReportMessage(selectedMessage)}
+                                        className="flex-row items-center gap-3 p-3 rounded-xl bg-orange-50"
+                                    >
+                                        <Text className="text-orange-600 text-lg">⚠️</Text>
+                                        <Text className="flex-1 text-orange-600 text-sm font-medium">Report Message</Text>
                                     </TouchableOpacity>
                                 )}
 
