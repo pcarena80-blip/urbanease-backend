@@ -11,10 +11,10 @@ export default function NoticesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const fetchNotices = async () => {
+  const displayNoticesList = async () => {
     try {
       console.log('📋 NoticeBoard: Fetching notices...');
-      const data = await api.notices.getAll();
+      const data = await api.notices.requestNoticesScreen();
       console.log('📋 NoticeBoard: Received', data?.length, 'notices');
 
       const validNotices = (data || []).filter((n: any) => {
@@ -40,13 +40,13 @@ export default function NoticesScreen() {
   // Load data on mount and when screen comes into focus
   useFocusEffect(
     useCallback(() => {
-      fetchNotices();
+      displayNoticesList();
     }, [])
   );
 
   const onRefresh = () => {
     setRefreshing(true);
-    fetchNotices();
+    displayNoticesList();
   };
 
   const getPriorityConfig = (priority: string) => {
@@ -70,6 +70,10 @@ export default function NoticesScreen() {
     } catch (e) {
       return dateString;
     }
+  };
+
+  const selectNotice = (notice: any) => {
+    navigation.navigate('NoticeDetails', { notice });
   };
 
   return (
@@ -107,7 +111,7 @@ export default function NoticesScreen() {
             return (
               <TouchableOpacity
                 key={notice._id || index}
-                onPress={() => navigation.navigate('NoticeDetails', { notice })}
+                onPress={() => selectNotice(notice)}
                 className="bg-white rounded-2xl p-5 shadow-sm mb-4"
                 activeOpacity={0.7}
               >
@@ -128,6 +132,15 @@ export default function NoticesScreen() {
                 <Text className="text-gray-600 text-sm" numberOfLines={2}>
                   {notice.description}
                 </Text>
+                {notice.attachment && (
+                  <View className="mt-3 rounded-xl overflow-hidden bg-gray-100">
+                    <Image
+                      source={{ uri: api.getImageUrl(notice.attachment) }}
+                      style={{ width: '100%', height: 120 }}
+                      resizeMode="cover"
+                    />
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })

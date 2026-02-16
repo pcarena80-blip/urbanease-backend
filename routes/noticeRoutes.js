@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const { getNotices, createNotice, deleteNotice } = require('../controllers/noticeController');
+const { requestNoticesScreen, submitNotice, deleteNotice } = require('../controllers/noticeController');
 const { protect } = require('../middleware/authMiddleware');
 
 // Get all notices (Protected)
-router.get('/', protect, getNotices);
+router.get('/', protect, requestNoticesScreen);
 
 // Admin Routes would go here (protected + admin check)
 // For now, just exposing get for the mobile app

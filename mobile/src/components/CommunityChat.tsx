@@ -30,10 +30,9 @@ export default function CommunityChat() {
         loadUser();
         loadLastReadId();
         loadCachedMessages();
-        loadMessages();
         loadUnreadCount();
         // Polling interval for updates
-        const interval = setInterval(loadMessages, 10000);
+        const interval = setInterval(displayChatWindow, 10000);
         return () => {
             clearInterval(interval);
             markAsRead(); // Mark as read when leaving
@@ -131,16 +130,16 @@ export default function CommunityChat() {
 
     const loadUnreadCount = async () => {
         try {
-            const counts = await api.chat.getUnreadCounts();
+            const counts = await api.chat.requestChatCenter();
             setUnreadCount(counts.community || 0);
         } catch (error) {
             console.log('Failed to load unread count');
         }
     };
 
-    const loadMessages = async () => {
+    const displayChatWindow = async () => {
         try {
-            const data = await api.chat.getMessages('community');
+            const data = await api.chat.displayChatWindow('community');
             setMessages(data);
             await AsyncStorage.setItem('cachedCommunityMessages', JSON.stringify(data));
         } catch (error) {
@@ -157,7 +156,7 @@ export default function CommunityChat() {
             setSelectedMessage(null);
             Alert.alert('Success', 'Message deleted');
             // Reload messages to show updated list
-            await loadMessages();
+            await displayChatWindow();
         } catch (error: any) {
             console.error('🗑️ CommunityChat: Delete error:', error);
             Alert.alert('Error', error.message || 'Failed to delete message');
@@ -218,6 +217,7 @@ export default function CommunityChat() {
             formData.append('receiverId', 'community');
 
             if (msgText) {
+                // @ts-ignore
                 formData.append('message', msgText);
             }
 

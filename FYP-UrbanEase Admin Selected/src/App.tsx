@@ -15,6 +15,7 @@ import { Login } from './components/Login';
 function AppContent() {
   const [activePage, setActivePage] = useState('dashboard');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const { theme } = useTheme();
 
   useEffect(() => {
@@ -23,6 +24,11 @@ function AppContent() {
       setIsAuthenticated(true);
     }
   }, []);
+
+  // Clear search when switching pages
+  useEffect(() => {
+    setSearchQuery('');
+  }, [activePage]);
 
   const handleLoginSuccess = () => {
     setIsAuthenticated(true);
@@ -39,13 +45,13 @@ function AppContent() {
       case 'dashboard':
         return <Dashboard />;
       case 'residents':
-        return <Residents />;
+        return <Residents searchQuery={searchQuery} />;
       case 'carpool':
         return <CarpoolManagement />;
       case 'complaints':
-        return <Complaints />;
+        return <Complaints searchQuery={searchQuery} />;
       case 'announcements':
-        return <Announcements />;
+        return <Announcements searchQuery={searchQuery} />;
       case 'chat':
         return <ChatModeration />;
       case 'settings':
@@ -63,7 +69,7 @@ function AppContent() {
     <div className={`flex h-screen ${theme === 'dark' ? 'bg-[#0D0D0D]' : 'bg-gray-50'}`}>
       <Sidebar activePage={activePage} setActivePage={setActivePage} />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
+        <Header onLogout={handleLogout} searchQuery={searchQuery} onSearchChange={setSearchQuery} />
         <main className="flex-1 overflow-y-auto p-6">
           {renderPage()}
         </main>

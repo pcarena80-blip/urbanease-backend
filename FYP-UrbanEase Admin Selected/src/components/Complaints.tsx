@@ -3,6 +3,10 @@ import { Filter, CheckCircle, Clock, AlertCircle, Eye, XCircle } from 'lucide-re
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 
+// Derive the server root URL from the API base URL (strip /api)
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SERVER_ROOT = API_BASE.replace(/\/api\/?$/, '');
+
 interface Complaint {
   _id: string;
   userId: {
@@ -21,7 +25,7 @@ interface Complaint {
   image?: string;
 }
 
-export function Complaints() {
+export function Complaints({ searchQuery = '' }: { searchQuery?: string }) {
   const { theme } = useTheme();
   const [filter, setFilter] = useState('active'); // Changed default to 'active'
   const [selectedComplaint, setSelectedComplaint] = useState<string | null>(null);
@@ -59,6 +63,15 @@ export function Complaints() {
     if (filter === 'active') return ['pending', 'in-progress'].includes(c.status);
     if (filter === 'history') return ['resolved', 'rejected'].includes(c.status);
     return c.status === filter;
+  }).filter((c) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      c.subject?.toLowerCase().includes(q) ||
+      c.category?.toLowerCase().includes(q) ||
+      c.description?.toLowerCase().includes(q) ||
+      c.userId?.name?.toLowerCase().includes(q)
+    );
   });
 
   const getStatusBadge = (status: string) => {
@@ -117,12 +130,12 @@ export function Complaints() {
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`px-4 py-2 rounded-lg transition-colors capitalize ${filter === f
-                    ? f === 'history'
-                      ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
-                      : 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
-                    : theme === 'dark'
-                      ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? f === 'history'
+                    ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white'
+                    : 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+                  : theme === 'dark'
+                    ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
               >
                 {f === 'history' ? '📜 History' : f.replace('-', ' ')}
@@ -186,7 +199,7 @@ export function Complaints() {
                     <h5 className={`mb-2 text-sm font-medium ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Attachment</h5>
                     <div className="rounded-lg overflow-hidden border border-gray-200 inline-block">
                       <img
-                        src={complaint.image.startsWith('http') ? complaint.image : `https://outlet-coverage-burns-abstract.trycloudflare.com/${complaint.image.replace(/\\/g, '/')}`}
+                        src={complaint.image.startsWith('http') ? complaint.image : `${SERVER_ROOT}/${complaint.image.replace(/\\/g, '/').replace(/^\//, '')}`}
                         alt="Complaint Attachment"
                         className="max-w-full h-auto max-h-64 object-contain"
                         onError={(e) => {

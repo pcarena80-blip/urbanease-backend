@@ -219,6 +219,53 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
     }
 });
 
+// Get Graph Data
+router.get('/stats/graphs', protect, adminMiddleware, async (req, res) => {
+    try {
+        // Activity Data (Last 24 Hours)
+        // Group by hour
+        const activityData = [];
+        const now = new Date();
+        for (let i = 23; i >= 0; i--) {
+            const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+            const hour = time.getHours();
+            const timeLabel = `${hour % 12 || 12} ${hour >= 12 ? 'PM' : 'AM'}`;
+
+            // Real data aggregation would go here. For now, we mock realistic data
+            // In a real app, you'd aggregate User.find({ lastLogin: ... }) and Complaint.find({ createdAt: ... })
+            activityData.push({
+                time: timeLabel,
+                logins: Math.floor(Math.random() * 10) + 2,
+                complaints: Math.floor(Math.random() * 5),
+                activity: Math.floor(Math.random() * 15) + 5
+            });
+        }
+
+        // Resolution Data (Last 7 Days)
+        const resolutionData = [];
+        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        for (let i = 6; i >= 0; i--) {
+            const date = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+            const dayLabel = days[date.getDay()];
+
+            resolutionData.push({
+                day: dayLabel,
+                resolved: Math.floor(Math.random() * 8) + 1,
+                pending: Math.floor(Math.random() * 5) + 1
+            });
+        }
+
+        res.json({
+            activityData,
+            resolutionData
+        });
+
+    } catch (error) {
+        console.error("Error fetching graph data:", error);
+        res.status(500).json({ message: 'Server error fetching graph data' });
+    }
+});
+
 // NOTICE ROUTES
 
 // Get all notices

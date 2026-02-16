@@ -7,7 +7,7 @@ interface AuthContextType {
     user: any;
     loading: boolean;
     prefetching: boolean;
-    login: (data: any) => Promise<void>;
+    loginSuccessful: (data: any) => Promise<void>;
     logout: () => Promise<void>;
     updateUser: (data: any) => Promise<void>;
     isAuthenticated: boolean;
@@ -40,11 +40,30 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const loadStorageData = async () => {
         try {
             const authDataSerialized = await AsyncStorage.getItem('user');
-            if (authDataSerialized) {
+            const token = await AsyncStorage.getItem('token');
+            if (authDataSerialized && token) {
                 const _authData = JSON.parse(authDataSerialized);
-                setUser(_authData);
-                // Prefetch data in background after loading user
-                prefetchAppData();
+
+                // Verify with server that account is still valid and verified
+                try {
+                    const profile = await api.auth.getProfile();
+                    if (profile && profile.isVerified) {
+                        setUser(_authData);
+                        prefetchAppData();
+                    } else {
+                        // User is not verified by admin - force logout
+                        console.log('Account not verified by admin - clearing session');
+                        await AsyncStorage.removeItem('token');
+                        await AsyncStorage.removeItem('user');
+                        setUser(null);
+                    }
+                } catch (error) {
+                    // Token invalid or server error - clear session
+                    console.log('Session validation failed - clearing session');
+                    await AsyncStorage.removeItem('token');
+                    await AsyncStorage.removeItem('user');
+                    setUser(null);
+                }
             }
         } catch (error) {
             console.error('Auth loading error:', error);
@@ -61,10 +80,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             // Fetch all critical data in parallel
             // We use allSettled to ensure one failure doesn't stop others
             const results = await Promise.allSettled([
-                api.notices.getAll(),
+                api.notices.requestNoticesScreen(),
                 api.bills.getAll(),
-                api.complaints.getAll(),
-                api.chat.getMessages('community'),
+                api.complaints.requestComplaintModule(),
+                api.chat.displayChatWindow('community'),
                 api.chat.getInbox()
             ]);
 
@@ -96,7 +115,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         }
     };
 
-    const login = async (data: any) => {
+    const loginSuccessful = async (data: any) => {
         setUser(data);
         await AsyncStorage.setItem('token', data.token);
         await AsyncStorage.setItem('user', JSON.stringify(data));
@@ -128,7 +147,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, prefetching, login, logout, updateUser, isAuthenticated: !!user, refreshData }}>
+        <AuthContext.Provider value={{ user, loading, prefetching, loginSuccessful, logout, updateUser, isAuthenticated: !!user, refreshData }}>
             {children}
         </AuthContext.Provider>
     );

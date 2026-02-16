@@ -18,14 +18,14 @@ export default function LoginScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [modal, setModal] = useState({ visible: false, type: 'success' as 'success' | 'error', title: '', message: '' });
 
-  const { login } = useAuth();
+  const { loginSuccessful } = useAuth();
 
   const handleModalClose = () => {
     setModal(prev => ({ ...prev, visible: false }));
     // Navigation is handled by App.tsx based on user state
   };
 
-  const handleLogin = async () => {
+  const submitLoginCredentials = async () => {
     if (!email || !password) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -33,8 +33,8 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const data = await api.auth.login(email.toLowerCase(), password); // Enforce lowercase email
-      await login(data); // Use AuthContext login
+      const data = await api.auth.submitLoginCredentials(email.toLowerCase(), password); // Enforce lowercase email
+      await loginSuccessful(data); // Use AuthContext login
 
       // No need to manually navigate, AuthProvider in App.tsx will switch stacks
     } catch (error: any) {
@@ -140,7 +140,7 @@ export default function LoginScreen() {
               </View>
 
               <TouchableOpacity
-                onPress={handleLogin}
+                onPress={submitLoginCredentials}
                 activeOpacity={0.8}
                 disabled={isLoading}
               >

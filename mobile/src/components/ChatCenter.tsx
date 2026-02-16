@@ -15,13 +15,13 @@ export default function ChatCenter() {
 
   useFocusEffect(
     useCallback(() => {
-      loadUnreadCounts();
+      requestChatCenter();
     }, [])
   );
 
-  const loadUnreadCounts = async () => {
+  const requestChatCenter = async () => {
     try {
-      const counts = await api.chat.getUnreadCounts();
+      const counts = await api.chat.requestChatCenter();
       setUnreadCounts(counts);
     } catch (error) {
       console.log('Failed to load counts');

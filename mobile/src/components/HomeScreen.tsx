@@ -29,14 +29,14 @@ export default function HomeScreen() {
         setUserName(parsed.name);
       }
       // Optionally fetch fresh profile
-      const profile = await api.profile.get();
+      const profile = await api.profile.requestEditProfileForm();
       if (profile?.name) setUserName(profile.name);
     } catch (e) { console.log(e); }
   };
 
   const loadNotices = async () => {
     try {
-      const data = await api.notices.getAll();
+      const data = await api.notices.requestNoticesScreen();
       // Filter out notices with invalid dates
       const validNotices = data.filter((n: any) => {
         if (!n.createdAt) return false;

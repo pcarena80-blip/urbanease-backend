@@ -30,13 +30,13 @@ export default function ProfileScreen() {
   });
 
   useEffect(() => {
-    loadProfile();
+    displayUserProfile();
   }, []);
 
-  const loadProfile = async () => {
+  const displayUserProfile = async () => {
     try {
       console.log('👤 ProfileScreen: Loading profile...');
-      const data = await api.profile.get();
+      const data = await api.profile.requestEditProfileForm();
       console.log('👤 ProfileScreen: Profile loaded successfully');
       setProfile(data);
     } catch (error: any) {
@@ -45,7 +45,7 @@ export default function ProfileScreen() {
         'Profile Load Error',
         `Could not load profile: ${error.message}\n\nYou can still logout if needed.`,
         [
-          { text: 'Retry', onPress: () => loadProfile() },
+          { text: 'Retry', onPress: () => displayUserProfile() },
           { text: 'OK', style: 'cancel' }
         ]
       );
@@ -89,7 +89,7 @@ export default function ProfileScreen() {
     <View className="h-full flex items-center justify-center bg-white space-y-4">
       <Text className="text-red-500 text-lg">Failed to load profile</Text>
       <TouchableOpacity
-        onPress={loadProfile}
+        onPress={displayUserProfile}
         className="bg-[#027A4C] px-6 py-3 rounded-xl"
       >
         <Text className="text-white font-semibold">Retry</Text>

@@ -28,7 +28,7 @@ const getUnreadCountForChat = async (userId, chatId) => {
 // @desc    Get chat messages
 // @route   GET /api/chat/:userId
 // @access  Private
-const getMessages = async (req, res) => {
+const displayChatWindow = async (req, res) => {
     const { userId } = req.params;
     const myId = req.user.id;
 
@@ -89,7 +89,7 @@ const getMessages = async (req, res) => {
 // @desc    Send chat message
 // @route   POST /api/chat
 // @access  Private
-const sendMessage = async (req, res) => {
+const deliverMessage = async (req, res) => {
     console.log('sendMessage called');
     console.log('Headers:', req.headers);
     console.log('Body:', req.body);
@@ -240,6 +240,7 @@ const deleteMessage = async (req, res) => {
     try {
         const messageId = req.params.id;
         const userId = req.user.id;
+        const userRole = req.user.role;
 
         const message = await ChatMessage.findById(messageId);
 
@@ -247,16 +248,23 @@ const deleteMessage = async (req, res) => {
             return res.status(404).json({ message: 'Message not found' });
         }
 
-        // Check ownership
-        if (message.senderId.toString() !== userId) {
+        // Admins/superadmins can delete any message; regular users can only delete their own
+        const isAdmin = userRole === 'admin' || userRole === 'superadmin';
+        if (!isAdmin && message.senderId.toString() !== userId) {
             return res.status(401).json({ message: 'Not authorized to delete this message' });
         }
 
         await message.deleteOne();
 
-        // Emit socket event for real-time deletion if it's a community message
-        if (req.io && message.receiverId === 'community') {
-            req.io.to('community').emit('message_deleted', { id: messageId });
+        // Emit socket event for real-time deletion
+        if (req.io) {
+            if (message.receiverId === 'community') {
+                req.io.to('community').emit('message_deleted', { id: messageId });
+            } else {
+                // Private chat: notify both sender and receiver rooms
+                req.io.to(message.senderId.toString()).emit('message_deleted', { id: messageId });
+                req.io.to(message.receiverId).emit('message_deleted', { id: messageId });
+            }
         }
 
         res.json({ message: 'Message deleted' });
@@ -269,7 +277,7 @@ const deleteMessage = async (req, res) => {
 // @desc    Get all unread message counts
 // @route   GET /api/chat/unread
 // @access  Private
-const getUnreadCounts = async (req, res) => {
+const requestChatCenter = async (req, res) => {
     try {
         const myId = req.user.id;
 
@@ -342,10 +350,10 @@ const markAsRead = async (req, res) => {
 };
 
 module.exports = {
-    getMessages,
-    sendMessage,
+    displayChatWindow,
+    deliverMessage,
     getInbox,
     deleteMessage,
-    getUnreadCounts,
+    requestChatCenter,
     markAsRead
 };

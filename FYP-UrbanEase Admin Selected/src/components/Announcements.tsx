@@ -11,7 +11,7 @@ interface Notice {
   createdAt: string;
 }
 
-export function Announcements() {
+export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
   const { theme } = useTheme();
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
@@ -158,7 +158,11 @@ export function Announcements() {
     return new Date(dateStr) < new Date();
   };
 
-  const displayNotices = activeTab === 'active' ? notices : historyNotices;
+  const displayNotices = (activeTab === 'active' ? notices : historyNotices).filter((n) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return n.title?.toLowerCase().includes(q) || n.description?.toLowerCase().includes(q);
+  });
   const isLoading = activeTab === 'active' ? loading : historyLoading;
 
   return (

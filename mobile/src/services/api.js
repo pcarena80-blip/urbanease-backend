@@ -123,7 +123,7 @@ const request = async (endpoint, options = {}, retries = 3) => {
 
 export const api = {
     auth: {
-        login: async (email, password) => {
+        submitLoginCredentials: async (email, password) => {
             return request('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
@@ -171,6 +171,9 @@ export const api = {
         },
         searchUsers: async (query) => {
             return request(`/auth/users?search=${query}`, { headers: await getHeaders() });
+        },
+        getProfile: async () => {
+            return request('/auth/profile', { headers: await getHeaders() });
         }
     },
     bills: {
@@ -195,10 +198,10 @@ export const api = {
         }
     },
     complaints: {
-        getAll: async () => {
+        requestComplaintModule: async () => {
             return request('/complaints', { headers: await getHeaders() });
         },
-        create: async (complaintData) => {
+        submitComplaint: async (complaintData) => {
             const headers = await getHeaders();
             // Remove Content-Type if FormData to let browser set boundary
             if (complaintData instanceof FormData) {
@@ -212,7 +215,7 @@ export const api = {
         }
     },
     chat: {
-        getMessages: async (userId) => {
+        displayChatWindow: async (userId) => {
             return request(`/chat/${userId}`, { headers: await getHeaders() });
         },
         getInbox: async () => {
@@ -244,7 +247,7 @@ export const api = {
                 headers: await getHeaders()
             });
         },
-        getUnreadCounts: async () => {
+        requestChatCenter: async () => {
             return request('/chat/unread', { headers: await getHeaders() });
         },
         markAsRead: async (chatId) => {
@@ -255,18 +258,18 @@ export const api = {
         }
     },
     notices: {
-        getAll: async () => {
+        requestNoticesScreen: async () => {
             return request('/notices', { headers: await getHeaders() });
         }
     },
     profile: {
-        get: async () => {
+        requestEditProfileForm: async () => {
             return request('/profile', { headers: await getHeaders() });
         },
         getById: async (id) => {
             return request(`/profile/${id}`, { headers: await getHeaders() });
         },
-        update: async (profileData) => {
+        submitProfileChanges: async (profileData) => {
             return request('/profile', {
                 method: 'PUT',
                 headers: await getHeaders(),

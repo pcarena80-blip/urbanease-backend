@@ -3,7 +3,7 @@ const router = express.Router();
 console.log('LOADING AUTH ROUTES...');
 const {
     registerUser,
-    loginUser,
+    submitLoginCredentials,
     updateProfile,
     getProfile,
     updateCommunityRead,
@@ -17,7 +17,7 @@ const {
 const { protect } = require('../middleware/authMiddleware');
 
 router.post('/signup', registerUser);
-router.post('/login', loginUser);
+router.post('/login', submitLoginCredentials);
 router.post('/send-otp', sendRegistrationOtp); // New
 router.post('/verify-otp', verifyRegistrationOtp); // New
 router.post('/forgot-password', forgotPassword);

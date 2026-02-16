@@ -2,7 +2,7 @@ const Notice = require('../models/Notice');
 
 // @desc    Get all notices
 // @route   GET /api/notices
-const getNotices = async (req, res) => {
+const requestNoticesScreen = async (req, res) => {
     try {
         // Only return notices that haven't expired
         const notices = await Notice.find({
@@ -17,7 +17,7 @@ const getNotices = async (req, res) => {
 
 // @desc    Create a notice (Admin only)
 // @route   POST /api/notices
-const createNotice = async (req, res) => {
+const submitNotice = async (req, res) => {
     const { title, description, expiryDate } = req.body;
 
     if (!title || !description) {
@@ -56,7 +56,7 @@ const deleteNotice = async (req, res) => {
 };
 
 module.exports = {
-    getNotices,
-    createNotice,
+    requestNoticesScreen,
+    submitNotice,
     deleteNotice
 };

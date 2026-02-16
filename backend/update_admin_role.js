@@ -1,6 +1,5 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
-const bcrypt = require('bcryptjs');
 dotenv.config();
 const User = require('./models/User');
 const connectDB = require('./config/db');
@@ -8,10 +7,11 @@ const connectDB = require('./config/db');
 connectDB().then(async () => {
     const user = await User.findOne({ email: 'admin@urbanease.com' });
     if (user) {
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash('password123', salt);
+        user.role = 'superadmin';
+        user.phone = '03010816321';
+        user.name = 'Super Admin';
         await user.save();
-        console.log('Password reset to password123 for:', user.email, '| role:', user.role);
+        console.log('Updated:', user.email, '| role:', user.role, '| phone:', user.phone, '| name:', user.name);
     } else {
         console.log('User not found');
     }

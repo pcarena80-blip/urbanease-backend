@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { User, Lock, LogOut, Mail, Phone, Plus, Ban, KeyRound, CheckCircle, XCircle, Trash2 } from 'lucide-react';
+import { User, Lock, LogOut, Mail, Phone, Plus, KeyRound, Trash2, UserPlus, Shield } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import { useRole } from '../contexts/RoleContext';
 import api from '../services/api';
@@ -7,16 +7,40 @@ import api from '../services/api';
 export function Settings() {
   const { theme } = useTheme();
   const { role } = useRole();
-  const [adminAccounts, setAdminAccounts] = useState<any[]>([]);
-  const [showAddModal, setShowAddModal] = useState(false); // Quick robust modal (or inline form)
 
-  // New Admin Form State
-  const [newName, setNewName] = useState('');
+  // Profile data from localStorage
+  const [profileData, setProfileData] = useState({ name: '', email: '', phone: '' });
+
+  // Admin management
+  const [adminAccounts, setAdminAccounts] = useState<any[]>([]);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [newEmail, setNewEmail] = useState('');
   const [newPassword, setNewPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [addLoading, setAddLoading] = useState(false);
+  const [addMessage, setAddMessage] = useState({ text: '', type: '' });
+
+  // Change password
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [pwdLoading, setPwdLoading] = useState(false);
+  const [pwdMessage, setPwdMessage] = useState({ text: '', type: '' });
 
   useEffect(() => {
+    const adminUser = localStorage.getItem('adminUser');
+    if (adminUser) {
+      try {
+        const user = JSON.parse(adminUser);
+        setProfileData({
+          name: user.name || '',
+          email: user.email || '',
+          phone: '03010816321'
+        });
+      } catch (e) {
+        console.error('Failed to parse adminUser', e);
+      }
+    }
+
     if (role === 'superadmin') {
       fetchAdmins();
     }
@@ -33,24 +57,23 @@ export function Settings() {
 
   const handleAddAdmin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    setAddLoading(true);
+    setAddMessage({ text: '', type: '' });
     try {
       await api.post('/admin/admins', {
-        name: newName,
+        name: 'Admin',
         email: newEmail,
-        password: newPassword,
-        phone: '+92 000 0000000' // Default or add input
+        password: newPassword
       });
       setShowAddModal(false);
       fetchAdmins();
-      setNewName('');
       setNewEmail('');
       setNewPassword('');
-      alert('Admin added successfully');
+      setAddMessage({ text: 'Admin account created successfully!', type: 'success' });
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to add admin');
+      setAddMessage({ text: error.response?.data?.message || 'Failed to add admin', type: 'error' });
     } finally {
-      setLoading(false);
+      setAddLoading(false);
     }
   };
 
@@ -61,6 +84,37 @@ export function Settings() {
       fetchAdmins();
     } catch (error) {
       alert('Failed to delete admin');
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwdMessage({ text: '', type: '' });
+
+    if (newPwd !== confirmPwd) {
+      setPwdMessage({ text: 'New passwords do not match', type: 'error' });
+      return;
+    }
+
+    if (newPwd.length < 6) {
+      setPwdMessage({ text: 'New password must be at least 6 characters', type: 'error' });
+      return;
+    }
+
+    setPwdLoading(true);
+    try {
+      const response = await api.put('/admin/change-password', {
+        currentPassword,
+        newPassword: newPwd
+      });
+      setPwdMessage({ text: response.data.message || 'Password updated successfully!', type: 'success' });
+      setCurrentPassword('');
+      setNewPwd('');
+      setConfirmPwd('');
+    } catch (error: any) {
+      setPwdMessage({ text: error.response?.data?.message || 'Failed to update password', type: 'error' });
+    } finally {
+      setPwdLoading(false);
     }
   };
 
@@ -77,104 +131,7 @@ export function Settings() {
         <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>Manage your admin profile and preferences</p>
       </div>
 
-      {/* Super Admin Only Section */}
-      {role === 'superadmin' && (
-        <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className={`text-lg ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>
-                Admin Accounts Management
-              </h3>
-              <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                Super Admin Only
-              </p>
-            </div>
-            <button
-              onClick={() => setShowAddModal(!showAddModal)}
-              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-xl hover:shadow-lg transition-shadow">
-              <Plus className="w-5 h-5" />
-              {showAddModal ? 'Cancel' : 'Add New Admin'}
-            </button>
-          </div>
-
-          {showAddModal && (
-            <div className={`mb-6 p-4 rounded-xl border ${theme === 'dark' ? 'border-[#333333] bg-[#2A2A2A]' : 'border-gray-200 bg-gray-50'}`}>
-              <form onSubmit={handleAddAdmin} className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <input
-                  required
-                  placeholder="Full Name"
-                  value={newName}
-                  onChange={e => setNewName(e.target.value)}
-                  className="p-2 rounded border"
-                />
-                <input
-                  required
-                  type="email"
-                  placeholder="Email"
-                  value={newEmail}
-                  onChange={e => setNewEmail(e.target.value)}
-                  className="p-2 rounded border"
-                />
-                <input
-                  required
-                  type="password"
-                  placeholder="Password"
-                  value={newPassword}
-                  onChange={e => setNewPassword(e.target.value)}
-                  className="p-2 rounded border"
-                />
-                <div className="md:col-span-3">
-                  <button disabled={loading} className="px-4 py-2 bg-green-600 text-white rounded">
-                    {loading ? 'Adding...' : 'Save New Admin'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          <div className={`${theme === 'dark' ? 'border-[#333333]' : 'border-gray-100'} border rounded-xl overflow-hidden`}>
-            <table className="w-full">
-              <thead className={`${theme === 'dark' ? 'bg-[#1A1A1A] border-[#333333]' : 'bg-gray-50 border-gray-200'} border-b`}>
-                <tr>
-                  <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Full Name</th>
-                  <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Email</th>
-                  <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Phone</th>
-                  <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Role</th>
-                  <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
-                </tr>
-              </thead>
-              <tbody className={`${theme === 'dark' ? 'divide-[#333333]' : 'divide-gray-200'} divide-y`}>
-                {adminAccounts.map((admin) => (
-                  <tr key={admin._id} className={theme === 'dark' ? 'hover:bg-[#2A2A2A]' : 'hover:bg-gray-50'}>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#00c878] to-[#00e68a] flex items-center justify-center text-white">
-                          {admin.name.charAt(0)}
-                        </div>
-                        <span className={theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}>{admin.name}</span>
-                      </div>
-                    </td>
-                    <td className={`px-6 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{admin.email}</td>
-                    <td className={`px-6 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{admin.phone}</td>
-                    <td className={`px-6 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{admin.role}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleDeleteAdmin(admin._id)}
-                          className={`flex items-center gap-1 px-3 py-2 text-sm ${theme === 'dark' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-700 hover:bg-red-200'} rounded-lg transition-colors`}>
-                          <Trash2 className="w-4 h-4" />
-                          Remove
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
+      {/* Profile Section */}
       <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
         <h3 className={`text-lg mb-4 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>
           {role === 'superadmin' ? 'Super Admin Profile' : 'Admin Profile'}
@@ -190,11 +147,12 @@ export function Settings() {
                 <User className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-white opacity-40' : 'text-gray-400'}`} />
                 <input
                   type="text"
-                  defaultValue={role === 'superadmin' ? 'Super Admin User' : 'Admin User'}
+                  value={profileData.name}
+                  readOnly
                   className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                      ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] focus:border-[#00c878]'
-                      : 'bg-white border-gray-200 focus:border-[#00c878]'
-                    } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
+                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2]'
+                    : 'bg-gray-50 border-gray-200 text-gray-600'
+                    }`}
                 />
               </div>
             </div>
@@ -204,11 +162,12 @@ export function Settings() {
                 <Mail className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-white opacity-40' : 'text-gray-400'}`} />
                 <input
                   type="email"
-                  defaultValue={role === 'superadmin' ? 'superadmin@urbanease.com' : 'admin@urbanease.com'}
+                  value={profileData.email}
+                  readOnly
                   className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                      ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] focus:border-[#00c878]'
-                      : 'bg-white border-gray-200 focus:border-[#00c878]'
-                    } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
+                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2]'
+                    : 'bg-gray-50 border-gray-200 text-gray-600'
+                    }`}
                 />
               </div>
             </div>
@@ -218,11 +177,12 @@ export function Settings() {
                 <Phone className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-white opacity-40' : 'text-gray-400'}`} />
                 <input
                   type="tel"
-                  defaultValue="+92 300 0000000"
+                  value={profileData.phone}
+                  readOnly
                   className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                      ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] focus:border-[#00c878]'
-                      : 'bg-white border-gray-200 focus:border-[#00c878]'
-                    } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
+                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2]'
+                    : 'bg-gray-50 border-gray-200 text-gray-600'
+                    }`}
                 />
               </div>
             </div>
@@ -230,24 +190,35 @@ export function Settings() {
               <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Role</label>
               <input
                 type="text"
-                defaultValue={role === 'superadmin' ? 'Super Admin — City Manager' : 'Admin — City Staff'}
+                value={role === 'superadmin' ? 'Super Admin' : 'Admin'}
                 disabled
                 className={`w-full px-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-gray-400'
-                    : 'bg-gray-50 border-gray-200 text-gray-600'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-gray-400'
+                  : 'bg-gray-50 border-gray-200 text-gray-600'
                   }`}
               />
             </div>
           </div>
         </div>
-        <button className="px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow">
-          Save Changes
-        </button>
       </div>
 
+      {/* Change Password Section */}
       <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
-        <h3 className={`text-lg mb-4 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>Change Password</h3>
-        <div className="space-y-4 max-w-lg">
+        <div className="flex items-center gap-2 mb-4">
+          <KeyRound className={`w-5 h-5 ${theme === 'dark' ? 'text-[#00c878]' : 'text-[#00c878]'}`} />
+          <h3 className={`text-lg ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>Change Password</h3>
+        </div>
+
+        {pwdMessage.text && (
+          <div className={`p-3 rounded-lg mb-4 text-sm ${pwdMessage.type === 'success'
+            ? (theme === 'dark' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-green-50 text-green-700 border border-green-200')
+            : (theme === 'dark' ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-red-50 text-red-700 border border-red-200')
+            }`}>
+            {pwdMessage.text}
+          </div>
+        )}
+
+        <form onSubmit={handleChangePassword} className="space-y-4 max-w-lg">
           <div>
             <label className={`block mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Current Password</label>
             <div className="relative">
@@ -255,9 +226,12 @@ export function Settings() {
               <input
                 type="password"
                 placeholder="Enter current password"
+                value={currentPassword}
+                onChange={e => setCurrentPassword(e.target.value)}
+                required
                 className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               />
             </div>
@@ -269,9 +243,12 @@ export function Settings() {
               <input
                 type="password"
                 placeholder="Enter new password"
+                value={newPwd}
+                onChange={e => setNewPwd(e.target.value)}
+                required
                 className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               />
             </div>
@@ -283,19 +260,157 @@ export function Settings() {
               <input
                 type="password"
                 placeholder="Confirm new password"
+                value={confirmPwd}
+                onChange={e => setConfirmPwd(e.target.value)}
+                required
                 className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
-                    ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
-                    : 'bg-white border-gray-200 focus:border-[#00c878]'
+                  ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                  : 'bg-white border-gray-200 focus:border-[#00c878]'
                   } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
               />
             </div>
           </div>
-          <button className="px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow">
-            Update Password
+          <button
+            type="submit"
+            disabled={pwdLoading}
+            className="px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow disabled:opacity-50"
+          >
+            {pwdLoading ? 'Updating...' : 'Update Password'}
           </button>
-        </div>
+        </form>
       </div>
 
+      {/* Create Admin Section - Super Admin Only */}
+      {role === 'superadmin' && (
+        <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <Shield className={`w-5 h-5 ${theme === 'dark' ? 'text-[#00c878]' : 'text-[#00c878]'}`} />
+              <div>
+                <h3 className={`text-lg ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>
+                  Create Admin Account
+                </h3>
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                  Super Admin Only — Create and manage admin accounts
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={() => { setShowAddModal(!showAddModal); setAddMessage({ text: '', type: '' }); }}
+              className="flex items-center gap-2 px-4 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-xl hover:shadow-lg transition-shadow">
+              <UserPlus className="w-5 h-5" />
+              {showAddModal ? 'Cancel' : 'Add New Admin'}
+            </button>
+          </div>
+
+          {addMessage.text && (
+            <div className={`p-3 rounded-lg mb-4 text-sm ${addMessage.type === 'success'
+              ? (theme === 'dark' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-green-50 text-green-700 border border-green-200')
+              : (theme === 'dark' ? 'bg-red-900/30 text-red-400 border border-red-800' : 'bg-red-50 text-red-700 border border-red-200')
+              }`}>
+              {addMessage.text}
+            </div>
+          )}
+
+          {showAddModal && (
+            <div className={`mb-6 p-5 rounded-xl border ${theme === 'dark' ? 'border-[#333333] bg-[#2A2A2A]' : 'border-gray-200 bg-gray-50'}`}>
+              <h4 className={`text-sm font-medium mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Enter Admin Credentials</h4>
+              <form onSubmit={handleAddAdmin} className="space-y-4 max-w-lg">
+                <div>
+                  <label className={`block mb-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Admin Email</label>
+                  <div className="relative">
+                    <Mail className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-white opacity-40' : 'text-gray-400'}`} />
+                    <input
+                      required
+                      type="email"
+                      autoComplete="off"
+                      placeholder="admin@example.com"
+                      value={newEmail}
+                      onChange={e => setNewEmail(e.target.value)}
+                      className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
+                        ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                        : 'bg-white border-gray-200 focus:border-[#00c878]'
+                        } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className={`block mb-2 text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>Admin Password</label>
+                  <div className="relative">
+                    <Lock className={`absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-white opacity-40' : 'text-gray-400'}`} />
+                    <input
+                      required
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="Set a password"
+                      value={newPassword}
+                      onChange={e => setNewPassword(e.target.value)}
+                      className={`w-full pl-12 pr-4 py-3 rounded-lg border ${theme === 'dark'
+                        ? 'bg-[#1A1A1A] border-[#333333] text-[#F2F2F2] placeholder-gray-500 focus:border-[#00c878]'
+                        : 'bg-white border-gray-200 focus:border-[#00c878]'
+                        } focus:outline-none focus:ring-2 focus:ring-[#00c878]/20`}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="submit"
+                  disabled={addLoading}
+                  className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white rounded-lg hover:shadow-lg transition-shadow disabled:opacity-50"
+                >
+                  <Plus className="w-4 h-4" />
+                  {addLoading ? 'Creating...' : 'Create Admin Account'}
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* Existing admins table */}
+          {adminAccounts.length > 0 && (
+            <div className={`${theme === 'dark' ? 'border-[#333333]' : 'border-gray-100'} border rounded-xl overflow-hidden`}>
+              <table className="w-full">
+                <thead className={`${theme === 'dark' ? 'bg-[#1A1A1A] border-[#333333]' : 'bg-gray-50 border-gray-200'} border-b`}>
+                  <tr>
+                    <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Admin</th>
+                    <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Email</th>
+                    <th className={`px-6 py-4 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody className={`${theme === 'dark' ? 'divide-[#333333]' : 'divide-gray-200'} divide-y`}>
+                  {adminAccounts.map((admin) => (
+                    <tr key={admin._id} className={theme === 'dark' ? 'hover:bg-[#2A2A2A]' : 'hover:bg-gray-50'}>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-r from-[#00c878] to-[#00e68a] flex items-center justify-center text-white">
+                            {admin.name?.charAt(0) || 'A'}
+                          </div>
+                          <span className={theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}>{admin.name}</span>
+                        </div>
+                      </td>
+                      <td className={`px-6 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>{admin.email}</td>
+                      <td className="px-6 py-4">
+                        <button
+                          onClick={() => handleDeleteAdmin(admin._id)}
+                          className={`flex items-center gap-1 px-3 py-2 text-sm ${theme === 'dark' ? 'bg-red-500/20 text-red-400 hover:bg-red-500/30' : 'bg-red-100 text-red-700 hover:bg-red-200'} rounded-lg transition-colors`}>
+                          <Trash2 className="w-4 h-4" />
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {adminAccounts.length === 0 && !showAddModal && (
+            <p className={`text-center py-6 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+              No admin accounts created yet. Click "Add New Admin" to create one.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Logout Section */}
       <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
         <h3 className={`text-lg mb-4 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>Danger Zone</h3>
         <p className={`mb-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>

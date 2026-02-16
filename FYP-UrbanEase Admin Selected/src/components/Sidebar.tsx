@@ -1,5 +1,6 @@
 import { Home, Users, CreditCard, AlertTriangle, Bell, MessageSquare, Settings, Car } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
+import { useRole } from '../contexts/RoleContext';
 
 interface SidebarProps {
   activePage: string;
@@ -8,6 +9,7 @@ interface SidebarProps {
 
 export function Sidebar({ activePage, setActivePage }: SidebarProps) {
   const { theme } = useTheme();
+  const { role } = useRole();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: Home },
@@ -17,7 +19,7 @@ export function Sidebar({ activePage, setActivePage }: SidebarProps) {
     { id: 'announcements', label: 'E-Notice Board', icon: Bell },
     { id: 'chat', label: 'Chat Moderation', icon: MessageSquare },
     { id: 'settings', label: 'Settings', icon: Settings },
-  ];
+  ].filter(item => item.id !== 'settings' || role === 'superadmin');
 
   return (
     <div className={`w-64 ${theme === 'dark' ? 'bg-[#1A1A1A] border-[#333333]' : 'bg-white border-gray-200'} border-r flex flex-col`}>

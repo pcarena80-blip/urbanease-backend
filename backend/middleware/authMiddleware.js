@@ -21,11 +21,6 @@ const protect = async (req, res, next) => {
                 return res.status(401).json({ message: 'User not found' });
             }
 
-            // Enforce verification check
-            if (!req.user.isVerified) {
-                return res.status(403).json({ message: 'Account pending verification. Please contact admin.' });
-            }
-
             next();
         } catch (error) {
             console.log(error);

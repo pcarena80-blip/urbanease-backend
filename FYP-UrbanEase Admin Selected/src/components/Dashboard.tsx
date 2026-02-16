@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
-import { UserCircle, AlertTriangle, Volume2, Bell, TrendingUp, Activity, RefreshCw, Loader2 } from 'lucide-react';
+import { UserCircle, AlertTriangle, UserX, Bell, TrendingUp, Activity, RefreshCw, Loader2 } from 'lucide-react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { useTheme } from '../contexts/ThemeContext';
+import { useRole } from '../contexts/RoleContext';
 import api from '../services/api';
 
 interface Stats {
   totalResidents: number;
   activeResidents: number;
+  unverifiedResidents: number;
   activeComplaints: number;
   pendingComplaints: number;
-  noiseComplaints: number;
   activeNotices: number;
 }
 
@@ -20,6 +21,7 @@ interface GraphData {
 
 export function Dashboard() {
   const { theme } = useTheme();
+  const { role } = useRole();
   const [loading, setLoading] = useState(true);
   const [graphLoading, setGraphLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -28,9 +30,9 @@ export function Dashboard() {
   const [stats, setStats] = useState<Stats>({
     totalResidents: 0,
     activeResidents: 0,
+    unverifiedResidents: 0,
     activeComplaints: 0,
     pendingComplaints: 0,
-    noiseComplaints: 0,
     activeNotices: 0
   });
 
@@ -104,7 +106,7 @@ export function Dashboard() {
       <div className="bg-gradient-to-r from-[#00c878] to-[#00e68a] rounded-2xl p-8 text-white shadow-lg">
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-3xl mb-2">{getGreeting()}, Admin!</h1>
+            <h1 className="text-3xl mb-2">{getGreeting()}, {role === 'superadmin' ? 'Super Admin' : 'Admin'}!</h1>
             <p className="text-white/90 mb-1">{new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
             <p className="text-white/80 italic">Convenience Meets Community</p>
           </div>
@@ -152,7 +154,19 @@ export function Dashboard() {
                 </div>
                 <p className={`text-3xl mb-1 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{stats.totalResidents}</p>
                 <p className={`mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Total Residents</p>
-                <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>{stats.activeResidents} verified</p>
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>verified</p>
+              </div>
+
+              {/* Unverified Residents */}
+              <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
+                <div className="flex items-start justify-between mb-4">
+                  <div className={`p-3 ${theme === 'dark' ? 'bg-red-500/20' : 'bg-red-50'} rounded-xl`}>
+                    <UserX className={`w-6 h-6 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} />
+                  </div>
+                </div>
+                <p className={`text-3xl font-bold mb-1 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{stats.unverifiedResidents}</p>
+                <p className={`mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Unverified Residents</p>
+                <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>awaiting verification</p>
               </div>
 
               {/* Active Complaints */}
@@ -165,18 +179,6 @@ export function Dashboard() {
                 <p className={`text-3xl mb-1 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{stats.activeComplaints}</p>
                 <p className={`mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Active Complaints</p>
                 <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>{stats.pendingComplaints} pending</p>
-              </div>
-
-              {/* Noise Complaints */}
-              <div className={`${theme === 'dark' ? 'bg-[#1F1F1F] border-[#333333]' : 'bg-white border-gray-100'} rounded-xl p-6 shadow-sm border`}>
-                <div className="flex items-start justify-between mb-4">
-                  <div className={`p-3 ${theme === 'dark' ? 'bg-red-500/20' : 'bg-red-50'} rounded-xl`}>
-                    <Volume2 className={`w-6 h-6 ${theme === 'dark' ? 'text-red-400' : 'text-red-500'}`} />
-                  </div>
-                </div>
-                <p className={`text-3xl mb-1 ${theme === 'dark' ? 'text-[#F2F2F2]' : 'text-gray-900'}`}>{stats.noiseComplaints}</p>
-                <p className={`mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Noise Complaints</p>
-                <p className={`text-sm ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>active reports</p>
               </div>
 
               {/* Active Notices */}

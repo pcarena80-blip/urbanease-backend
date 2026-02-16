@@ -26,12 +26,12 @@ export default function EditProfileScreen() {
   });
 
   useEffect(() => {
-    loadProfile();
+    displayEditProfileForm();
   }, []);
 
-  const loadProfile = async () => {
+  const displayEditProfileForm = async () => {
     try {
-      const data = await api.profile.get();
+      const data = await api.profile.requestEditProfileForm();
       // The API returns "formattedAddress" but we need raw fields.
       // Ideally the backend GET /profile return object includes raw fields (it does, see profileController.getProfile: populatedProfile.toObject() includes them).
       // So we can extract them.
@@ -48,7 +48,11 @@ export default function EditProfileScreen() {
     }
   };
 
-  const handleSave = async () => {
+  const updateProfileField = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const submitProfileChanges = async () => {
     setSaving(true);
     try {
       // Validate password if provided
@@ -62,7 +66,7 @@ export default function EditProfileScreen() {
       }
 
       // Send only necessary fields
-      await api.profile.update({
+      await api.profile.submitProfileChanges({
         phone: formData.phone,
         password: formData.password || undefined,
         block: formData.block,
@@ -133,7 +137,7 @@ export default function EditProfileScreen() {
               <Phone size={20} color="#9CA3AF" strokeWidth={1.5} />
               <TextInput
                 value={formData.phone}
-                onChangeText={(text) => setFormData({ ...formData, phone: text })}
+                onChangeText={(text) => updateProfileField('phone', text)}
                 className="flex-1 py-3.5 ml-3 text-base text-gray-900"
                 placeholder="Phone Number"
                 keyboardType="phone-pad"
@@ -165,7 +169,7 @@ export default function EditProfileScreen() {
                 placeholder="Enter new password"
                 secureTextEntry
                 value={formData.password}
-                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                onChangeText={(text) => updateProfileField('password', text)}
                 className="flex-1 py-3.5 ml-3 text-base text-gray-900"
               />
             </View>
@@ -181,7 +185,7 @@ export default function EditProfileScreen() {
                 <View className="flex-1">
                   <TextInput
                     value={formData.block}
-                    onChangeText={(text) => setFormData({ ...formData, block: text })}
+                    onChangeText={(text) => updateProfileField('block', text)}
                     placeholder="Block"
                     className="px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                   />
@@ -189,7 +193,7 @@ export default function EditProfileScreen() {
                 <View className="flex-1">
                   <TextInput
                     value={formData.street}
-                    onChangeText={(text) => setFormData({ ...formData, street: text })}
+                    onChangeText={(text) => updateProfileField('street', text)}
                     placeholder="Street"
                     className="px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                   />
@@ -197,7 +201,7 @@ export default function EditProfileScreen() {
                 <View className="flex-1">
                   <TextInput
                     value={formData.houseNo}
-                    onChangeText={(text) => setFormData({ ...formData, houseNo: text })}
+                    onChangeText={(text) => updateProfileField('houseNo', text)}
                     placeholder="House"
                     className="px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                   />
@@ -208,7 +212,7 @@ export default function EditProfileScreen() {
                 <View>
                   <TextInput
                     value={formData.plazaName}
-                    onChangeText={(text) => setFormData({ ...formData, plazaName: text })}
+                    onChangeText={(text) => updateProfileField('plazaName', text)}
                     placeholder="Plaza Name"
                     className="w-full px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                   />
@@ -217,7 +221,7 @@ export default function EditProfileScreen() {
                   <View className="flex-1">
                     <TextInput
                       value={formData.floorNumber}
-                      onChangeText={(text) => setFormData({ ...formData, floorNumber: text })}
+                      onChangeText={(text) => updateProfileField('floorNumber', text)}
                       placeholder="Floor"
                       className="px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                     />
@@ -225,7 +229,7 @@ export default function EditProfileScreen() {
                   <View className="flex-1">
                     <TextInput
                       value={formData.flatNumber}
-                      onChangeText={(text) => setFormData({ ...formData, flatNumber: text })}
+                      onChangeText={(text) => updateProfileField('flatNumber', text)}
                       placeholder="Flat No."
                       className="px-3 py-3 border border-gray-200 rounded-xl text-sm bg-white"
                     />
@@ -237,7 +241,7 @@ export default function EditProfileScreen() {
           </View>
 
           <TouchableOpacity
-            onPress={handleSave}
+            onPress={submitProfileChanges}
             disabled={saving}
             className="w-full rounded-xl shadow-md"
           >

@@ -16,15 +16,15 @@ export default function ComplaintsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      loadComplaints();
+      displayComplaintsScreen();
     }, [])
   );
 
-  const loadComplaints = async () => {
+  const displayComplaintsScreen = async () => {
     try {
       console.log('🎫 ComplaintsScreen: Loading complaints...');
       setLoading(true);
-      const data = await api.complaints.getAll();
+      const data = await api.complaints.requestComplaintModule();
       console.log('🎫 ComplaintsScreen: Received', data?.length, 'complaints');
       setComplaints(data || []);
     } catch (error: any) {
@@ -33,7 +33,7 @@ export default function ComplaintsScreen() {
         'Cannot Load Complaints',
         error.message || 'Please check your internet connection and try again.',
         [
-          { text: 'Retry', onPress: () => loadComplaints() },
+          { text: 'Retry', onPress: () => displayComplaintsScreen() },
           { text: 'Cancel', style: 'cancel' }
         ]
       );

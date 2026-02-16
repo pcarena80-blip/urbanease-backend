@@ -82,8 +82,8 @@ export default function PrivateChatDetail() {
         try {
             const [msgs, counts] = await Promise.race([
                 Promise.all([
-                    api.chat.getMessages(chat.id),
-                    api.chat.getUnreadCounts()
+                    api.chat.displayChatWindow(chat.id),
+                    api.chat.requestChatCenter()
                 ]),
                 timeout
             ]);
@@ -116,7 +116,7 @@ export default function PrivateChatDetail() {
         if (!chat?.id) return;
 
         try {
-            const data = await api.chat.getMessages(chat.id);
+            const data = await api.chat.displayChatWindow(chat.id);
             const messagesArray = Array.isArray(data) ? data : [];
 
             // Only update if changes to avoid re-renders
@@ -137,7 +137,7 @@ export default function PrivateChatDetail() {
     const loadUnreadCount = async () => {
         try {
             // We can get the specific count for this chat by getting all counts
-            const counts = await api.chat.getUnreadCounts();
+            const counts = await api.chat.requestChatCenter();
             if (counts.privateChats && counts.privateChats[chat.id]) {
                 setUnreadCount(counts.privateChats[chat.id]);
             } else {

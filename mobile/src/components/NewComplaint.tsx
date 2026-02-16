@@ -28,7 +28,7 @@ export default function NewComplaint() {
     'Other'
   ];
 
-  const pickImage = async () => {
+  const attachPhoto = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -41,7 +41,7 @@ export default function NewComplaint() {
     }
   };
 
-  const handleSubmit = async () => {
+  const submitComplaint = async () => {
     if (!formData.category || !formData.subject || !formData.description) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -64,7 +64,7 @@ export default function NewComplaint() {
         });
       }
 
-      await api.complaints.create(data);
+      await api.complaints.submitComplaint(data);
       Alert.alert('Success', 'Complaint submitted successfully');
       navigation.goBack();
     } catch (error) {
@@ -118,7 +118,8 @@ export default function NewComplaint() {
                     <TouchableOpacity
                       key={cat}
                       onPress={() => {
-                        setFormData({ ...formData, category: cat });
+                        const selectCategory = (cat: string) => setFormData({ ...formData, category: cat });
+                        selectCategory(cat);
                         setShowDropdown(false);
                       }}
                       className={`px-4 py-3 ${index !== categories.length - 1 ? 'border-b border-gray-50' : ''}`}
@@ -153,7 +154,10 @@ export default function NewComplaint() {
             </Text>
             <TextInput
               value={formData.description}
-              onChangeText={(text) => setFormData({ ...formData, description: text })}
+              onChangeText={(text) => {
+                const enterComplaintDetails = (details: string) => setFormData({ ...formData, description: details });
+                enterComplaintDetails(text);
+              }}
               placeholder="Provide detailed information about your complaint"
               multiline
               numberOfLines={4}
@@ -167,7 +171,7 @@ export default function NewComplaint() {
               Attach Photo (Optional)
             </Text>
             <TouchableOpacity
-              onPress={pickImage}
+              onPress={attachPhoto}
               className="w-full p-8 border-2 border-dashed border-gray-300 rounded-xl items-center gap-3"
             >
               {selectedImage ? (
@@ -194,7 +198,7 @@ export default function NewComplaint() {
           </View>
 
           <TouchableOpacity
-            onPress={handleSubmit}
+            onPress={submitComplaint}
             className="w-full rounded-xl shadow-md"
           >
             <LinearGradient

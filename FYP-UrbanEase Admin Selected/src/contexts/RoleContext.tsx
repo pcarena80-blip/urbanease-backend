@@ -4,6 +4,7 @@ type Role = 'superadmin' | 'admin' | 'user' | null;
 
 interface RoleContextType {
   role: Role;
+  setRole: (role: Role) => void;
 }
 
 const RoleContext = createContext<RoleContextType | undefined>(undefined);
@@ -24,7 +25,7 @@ export function RoleProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <RoleContext.Provider value={{ role }}>
+    <RoleContext.Provider value={{ role, setRole }}>
       {children}
     </RoleContext.Provider>
   );

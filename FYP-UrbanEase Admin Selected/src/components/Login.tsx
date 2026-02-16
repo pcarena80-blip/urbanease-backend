@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import api from '../services/api';
 import { Building2, Eye, EyeOff, Shield, Mail, Lock, CircuitBoard, Activity, Headphones } from 'lucide-react';
+import { useRole } from '../contexts/RoleContext';
 
 interface LoginProps {
     onLoginSuccess: () => void;
@@ -13,6 +14,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
     const [loading, setLoading] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [rememberMe, setRememberMe] = useState(false);
+    const { setRole } = useRole();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -32,6 +34,7 @@ export function Login({ onLoginSuccess }: LoginProps) {
 
             localStorage.setItem('adminToken', token);
             localStorage.setItem('adminUser', JSON.stringify(userData));
+            setRole(userData.role);
             onLoginSuccess();
         } catch (err: any) {
             console.error('Login Error:', err);

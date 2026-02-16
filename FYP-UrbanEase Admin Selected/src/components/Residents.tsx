@@ -21,7 +21,7 @@ interface User {
   isChatBlocked?: boolean;
 }
 
-export function Residents() {
+export function Residents({ searchQuery = '' }: { searchQuery?: string }) {
   const { theme } = useTheme();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,14 +50,14 @@ export function Residents() {
     fetchUsers();
   }, []);
 
-  const handleVerify = async (userId: string) => {
+  const handleVerify = async (userId: string, isVerified: boolean) => {
     try {
-      await api.put(`/admin/users/${userId}/verify`);
+      await api.put(`/admin/users/${userId}/verify`, { isVerified });
       // Refresh list locally
-      setUsers(users.map(user => user._id === userId ? { ...user, isVerified: true } : user));
+      setUsers(users.map(user => user._id === userId ? { ...user, isVerified } : user));
     } catch (error) {
-      console.error("Failed to verify user", error);
-      alert("Failed to verify user");
+      console.error("Failed to update user verification", error);
+      alert("Failed to update user verification status");
     }
   };
 
@@ -119,22 +119,31 @@ export function Residents() {
   const getActionButtons = (user: User) => {
     return (
       <div className="flex gap-2 flex-wrap">
-        {!user.isVerified && (
+        {!user.isVerified ? (
           <button
-            onClick={() => handleVerify(user._id)}
+            onClick={() => handleVerify(user._id, true)}
             className="flex items-center gap-1 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
             title="Verify User"
           >
             <Check className="w-4 h-4" />
             Verify
           </button>
+        ) : (
+          <button
+            onClick={() => handleVerify(user._id, false)}
+            className="flex items-center gap-1 px-3 py-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition-colors text-sm"
+            title="Unverify User"
+          >
+            <XCircle className="w-4 h-4" />
+            Unverify
+          </button>
         )}
         {user.isVerified && (
           <button
             onClick={() => handleToggleChatBlock(user._id, user.isChatBlocked || false)}
             className={`flex items-center gap-1 px-3 py-2 rounded-lg transition-colors text-sm ${user.isChatBlocked
-                ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              ? 'bg-orange-100 text-orange-700 hover:bg-orange-200'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             title={user.isChatBlocked ? 'Unblock from Chat' : 'Block from Chat'}
           >
@@ -186,7 +195,16 @@ export function Residents() {
                 <tr><td colSpan={6} className="text-center p-4">Loading users...</td></tr>
               ) : users.length === 0 ? (
                 <tr><td colSpan={6} className="text-center p-4">No residents found.</td></tr>
-              ) : users.map((user) => (
+              ) : users.filter(u => {
+                if (!searchQuery) return true;
+                const q = searchQuery.toLowerCase();
+                return (
+                  u.name?.toLowerCase().includes(q) ||
+                  u.email?.toLowerCase().includes(q) ||
+                  u.phone?.toLowerCase().includes(q) ||
+                  u.cnic?.toLowerCase().includes(q)
+                );
+              }).map((user) => (
                 <tr key={user._id} className={theme === 'dark' ? 'hover:bg-[#2A2A2A]' : 'hover:bg-gray-50'}>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-3">

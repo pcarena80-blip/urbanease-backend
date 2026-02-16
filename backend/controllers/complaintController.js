@@ -3,7 +3,7 @@ const Complaint = require('../models/Complaint');
 // @desc    Get complaints
 // @route   GET /api/complaints
 // @access  Private
-const getComplaints = async (req, res) => {
+const requestComplaintModule = async (req, res) => {
     const complaints = await Complaint.find({ userId: req.user.id });
     res.status(200).json(complaints);
 };
@@ -11,7 +11,7 @@ const getComplaints = async (req, res) => {
 // @desc    Create complaint
 // @route   POST /api/complaints
 // @access  Private
-const createComplaint = async (req, res) => {
+const submitComplaint = async (req, res) => {
     try {
         if (!req.body.subject || !req.body.description) {
             return res.status(400).json({ message: 'Please add subject and description' });
@@ -63,7 +63,7 @@ const updateComplaint = async (req, res) => {
 };
 
 module.exports = {
-    getComplaints,
-    createComplaint,
+    requestComplaintModule,
+    submitComplaint,
     updateComplaint,
 };

@@ -8,7 +8,7 @@ const bcrypt = require('bcryptjs');
 // @desc    Get user profile
 // @route   GET /api/profile
 // @access  Private
-const getProfile = async (req, res) => {
+const requestEditProfileForm = async (req, res) => {
     try {
         const user = await User.findById(req.user.id).select('-password');
 
@@ -94,7 +94,7 @@ const getUserProfileById = async (req, res) => {
 // @desc    Update user profile
 // @route   PUT /api/profile
 // @access  Private
-const updateProfile = async (req, res) => {
+const submitProfileChanges = async (req, res) => {
     // We need to update the User model, not just UserProfile if we want to change phone/address
     // because those fields are stored on User (and mirrored/populated).
 
@@ -197,7 +197,7 @@ const updateProfile = async (req, res) => {
 };
 
 module.exports = {
-    getProfile,
-    updateProfile,
+    requestEditProfileForm,
+    submitProfileChanges,
     getUserProfileById
 };

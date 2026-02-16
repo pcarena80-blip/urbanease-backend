@@ -207,7 +207,7 @@ const registerUser = async (req, res) => {
 // @desc    Authenticate a user
 // @route   POST /api/auth/login
 // @access  Public
-const loginUser = async (req, res) => {
+const submitLoginCredentials = async (req, res) => {
     let { email, password } = req.body;
     email = email.toLowerCase();
 
@@ -428,7 +428,7 @@ const resetPassword = async (req, res) => {
 
 module.exports = {
     registerUser,
-    loginUser,
+    submitLoginCredentials,
     updateProfile,
     getProfile,
     updateCommunityRead,

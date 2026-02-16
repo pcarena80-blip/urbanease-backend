@@ -1,8 +1,13 @@
 import { useState, useEffect } from 'react';
-import { Filter, Trash2, Ban, Flag } from 'lucide-react';
+import { Filter, Trash2, Ban, Flag, ImageIcon } from 'lucide-react';
 import { useTheme } from '../contexts/ThemeContext';
 import api from '../services/api';
 import { toast } from 'sonner';
+
+// Derive the server root URL from the API base URL (strip /api)
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const SERVER_ROOT = API_BASE.replace(/\/api\/?$/, '');
+
 
 interface Message {
   id: string;
@@ -11,6 +16,8 @@ interface Message {
   time: string;
   flagged: boolean;
   senderId?: string;
+  attachment?: string;
+  attachmentType?: string;
 }
 
 export function ChatModeration() {
@@ -19,17 +26,27 @@ export function ChatModeration() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const getImageUrl = (path: string) => {
+    if (!path) return '';
+    if (path.startsWith('http')) return path;
+    const clean = path.replace(/\\/g, '/').replace(/^\//, '');
+    return `${SERVER_ROOT}/${clean}`;
+  };
+
   const fetchMessages = async () => {
     try {
       const response = await api.get('/chat/community');
+
       // Map backend response to component format
       const formattedMessages = response.data.map((msg: any) => ({
         id: msg.id,
         user: msg.name || 'Unknown User',
-        message: msg.message || (msg.attachment ? 'Attachment' : ''),
+        message: msg.message || '',
         time: msg.time,
         flagged: false, // Backend doesn't support flagging yet
-        senderId: msg.senderId
+        senderId: msg.senderId,
+        attachment: msg.attachment || null,
+        attachmentType: msg.attachmentType || null,
       }));
       setMessages(formattedMessages);
     } catch (error) {
@@ -77,10 +94,10 @@ export function ChatModeration() {
             <button
               onClick={() => setFilter('all')}
               className={`px-4 py-2 rounded-lg transition-colors ${filter === 'all'
-                  ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
-                  : theme === 'dark'
-                    ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+                : theme === 'dark'
+                  ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
               All Messages
@@ -88,10 +105,10 @@ export function ChatModeration() {
             <button
               onClick={() => setFilter('flagged')}
               className={`px-4 py-2 rounded-lg transition-colors ${filter === 'flagged'
-                  ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
-                  : theme === 'dark'
-                    ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                ? 'bg-gradient-to-r from-[#00c878] to-[#00e68a] text-white'
+                : theme === 'dark'
+                  ? 'bg-[#2A2A2A] text-gray-300 hover:bg-[#333333]'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
             >
               Flagged Messages
@@ -114,12 +131,12 @@ export function ChatModeration() {
             <div
               key={msg.id}
               className={`rounded-xl p-5 shadow-sm border ${msg.flagged
-                  ? theme === 'dark'
-                    ? 'bg-red-500/10 border-red-500/30'
-                    : 'bg-red-50/30 border-red-200'
-                  : theme === 'dark'
-                    ? 'bg-[#1F1F1F] border-[#333333]'
-                    : 'bg-white border-gray-100'
+                ? theme === 'dark'
+                  ? 'bg-red-500/10 border-red-500/30'
+                  : 'bg-red-50/30 border-red-200'
+                : theme === 'dark'
+                  ? 'bg-[#1F1F1F] border-[#333333]'
+                  : 'bg-white border-gray-100'
                 }`}
             >
               <div className="flex items-start justify-between">
@@ -139,7 +156,44 @@ export function ChatModeration() {
                         </span>
                       )}
                     </div>
-                    <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{msg.message}</p>
+                    {/* Image attachment preview */}
+                    {msg.attachment && msg.attachmentType === 'image' && (
+                      <div className="mb-2">
+                        <a href={getImageUrl(msg.attachment)} target="_blank" rel="noopener noreferrer">
+                          <img
+                            src={getImageUrl(msg.attachment)}
+                            alt="Chat attachment"
+                            className="max-w-[200px] max-h-[150px] rounded-lg object-cover border border-gray-200 hover:opacity-90 transition-opacity"
+                            onError={(e) => {
+                              // Replace broken image with a placeholder link
+                              const el = e.target as HTMLImageElement;
+                              const parent = el.parentElement;
+                              if (parent) {
+                                const filename = msg.attachment!.split('/').pop() || 'image';
+                                parent.innerHTML = `<span style="display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:8px;background:#f3f4f6;color:#3b82f6;font-size:13px;">🖼️ ${filename}</span>`;
+                              }
+                            }}
+                          />
+                        </a>
+                      </div>
+                    )}
+                    {/* Non-image file attachment */}
+                    {msg.attachment && msg.attachmentType !== 'image' && (
+                      <div className="mb-2">
+                        <a
+                          href={getImageUrl(msg.attachment)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm ${theme === 'dark' ? 'bg-[#2A2A2A] text-blue-400 hover:bg-[#333333]' : 'bg-gray-100 text-blue-600 hover:bg-gray-200'}`}
+                        >
+                          <ImageIcon className="w-4 h-4" />
+                          📎 File Attachment
+                        </a>
+                      </div>
+                    )}
+                    {msg.message && (
+                      <p className={theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}>{msg.message}</p>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">

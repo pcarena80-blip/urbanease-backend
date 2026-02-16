@@ -34,13 +34,19 @@ router.get('/users', protect, adminMiddleware, async (req, res) => {
 });
 
 // Verify user
+// Verify user
 router.put('/users/:id/verify', protect, adminMiddleware, async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
         if (user) {
-            user.isVerified = true;
+            const { isVerified } = req.body;
+            // If isVerified is provided, use it; otherwise default to true
+            user.isVerified = isVerified !== undefined ? isVerified : true;
             await user.save();
-            res.json({ message: 'User verified successfully' });
+            res.json({
+                message: `User ${user.isVerified ? 'verified' : 'unverified'} successfully`,
+                isVerified: user.isVerified
+            });
         } else {
             res.status(404).json({ message: 'User not found' });
         }
@@ -302,16 +308,11 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
         // Users Stats
         const totalResidents = await User.countDocuments({ role: 'user' });
         const activeResidents = await User.countDocuments({ role: 'user', isVerified: true });
+        const unverifiedResidents = await User.countDocuments({ role: 'user', $or: [{ isVerified: false }, { isVerified: { $exists: false } }] });
 
         // Complaint Stats
         const activeComplaints = await Complaint.countDocuments({ status: 'in-progress' });
         const pendingComplaints = await Complaint.countDocuments({ status: 'pending' });
-
-        // Noise Complaints (active only - pending or in-progress)
-        const noiseComplaints = await Complaint.countDocuments({
-            category: { $in: ['Noise', 'Noise Complaint'] },
-            status: { $in: ['pending', 'in-progress'] }
-        });
 
         // Notice Stats
         const activeNotices = await Notice.countDocuments({ expiryDate: { $gte: new Date() } });
@@ -319,9 +320,9 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
         res.json({
             totalResidents,
             activeResidents,
+            unverifiedResidents,
             activeComplaints,
             pendingComplaints,
-            noiseComplaints,
             activeNotices
         });
 
@@ -331,9 +332,9 @@ router.get('/stats', protect, adminMiddleware, async (req, res) => {
         res.json({
             totalResidents: 0,
             activeResidents: 0,
+            unverifiedResidents: 0,
             activeComplaints: 0,
             pendingComplaints: 0,
-            noiseComplaints: 0,
             activeNotices: 0
         });
     }
@@ -558,13 +559,13 @@ router.post('/admins', protect, superAdminMiddleware, async (req, res) => {
     try {
         const { name, email, phone, password } = req.body;
 
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: 'Please provide name, email, and password' });
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Please provide email and password' });
         }
 
         const userExists = await User.findOne({ email });
         if (userExists) {
-            return res.status(400).json({ message: 'User already exists' });
+            return res.status(400).json({ message: 'User already exists with this email' });
         }
 
         // Hash password
@@ -572,13 +573,15 @@ router.post('/admins', protect, superAdminMiddleware, async (req, res) => {
         const hashedPassword = await require('bcryptjs').hash(password, salt);
 
         const admin = await User.create({
-            name,
+            name: name || 'Admin',
             email,
             phone: phone || '',
             password: hashedPassword,
             role: 'admin',
             isVerified: true
         });
+
+        console.log('Admin created:', admin.email);
 
         res.status(201).json({
             _id: admin.id,
@@ -587,7 +590,8 @@ router.post('/admins', protect, superAdminMiddleware, async (req, res) => {
             role: admin.role
         });
     } catch (error) {
-        res.status(500).json({ message: 'Server error', error: error.message });
+        console.error('Create admin error:', error);
+        res.status(500).json({ message: 'Server error: ' + error.message });
     }
 });
 
@@ -602,6 +606,44 @@ router.delete('/admins/:id', protect, superAdminMiddleware, async (req, res) => 
             res.status(404).json({ message: 'Admin not found or not an admin' });
         }
     } catch (error) {
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+// Change password (for admin and superadmin)
+router.put('/change-password', protect, adminMiddleware, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: 'Please provide current password and new password' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ message: 'New password must be at least 6 characters' });
+        }
+
+        const user = await User.findById(req.user._id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Verify current password
+        const bcrypt = require('bcryptjs');
+        const isMatch = await bcrypt.compare(currentPassword, user.password);
+        if (!isMatch) {
+            return res.status(400).json({ message: 'Current password is incorrect' });
+        }
+
+        // Hash and save new password
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+
+        console.log(`Password changed for: ${user.email}`);
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        console.error('Change password error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
