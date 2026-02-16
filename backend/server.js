@@ -36,7 +36,7 @@ app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 // });
 
 // Serve static files (uploads) with aggressive caching
-app.use('/uploads', express.static(path.join(__dirname, '../uploads'), {
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
     maxAge: '7d',
     etag: true,
     lastModified: true
