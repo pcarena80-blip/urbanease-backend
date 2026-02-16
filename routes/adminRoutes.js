@@ -293,12 +293,15 @@ const upload = require('../middleware/uploadMiddleware');
 router.post('/notices', protect, adminMiddleware, upload.single('file'), async (req, res) => {
     try {
         const { title, description, expiryDate } = req.body;
+        console.log('📌 Notice creation - file:', req.file ? req.file.filename : 'NO FILE');
+        console.log('📌 Notice creation - body:', { title, description, expiryDate });
         const notice = await Notice.create({
             title,
             description,
             expiryDate,
             attachment: req.file ? `uploads/${req.file.filename}` : null
         });
+        console.log('📌 Notice created:', { id: notice._id, attachment: notice.attachment });
 
         // Notify users via Socket.IO
         if (req.io) {
@@ -307,6 +310,7 @@ router.post('/notices', protect, adminMiddleware, upload.single('file'), async (
 
         res.status(201).json(notice);
     } catch (error) {
+        console.error('📌 Notice creation error:', error);
         res.status(500).json({ message: 'Server error' });
     }
 });
