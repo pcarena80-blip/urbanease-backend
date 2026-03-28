@@ -1,6 +1,6 @@
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert } from 'react-native';
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight, Car } from 'lucide-react-native';
+import { CheckCircle2, Receipt, MessageSquare, ClipboardList, FileText, User, ArrowRight, Car } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
@@ -93,15 +93,17 @@ export default function HomeScreen() {
               Check out today's updates
             </Text>
           </View>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Notifications')}
-            className="w-11 h-11 rounded-xl bg-white/10 flex items-center justify-center relative"
-          >
-            <Bell size={20} color="white" strokeWidth={1.5} />
-            <View className="absolute -top-1 -right-1 w-5 h-5 bg-[#F44336] rounded-full flex items-center justify-center">
-              <Text className="text-white text-[10px] font-bold">3</Text>
+          <View className="px-3 py-2 rounded-xl bg-white/10 flex-row items-center gap-2">
+            <CheckCircle2 size={16} color="white" strokeWidth={1.8} />
+            <View>
+              <Text className="text-white text-[11px] font-semibold">
+                App Updated
+              </Text>
+              <Text className="text-white/70 text-[10px]">
+                Latest version
+              </Text>
             </View>
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Notice Board Preview Card */}
@@ -163,7 +165,6 @@ export default function HomeScreen() {
           <View className="flex-row flex-wrap">
             {quickActions.map((action, index) => (
               <TouchableOpacity
-                key={action.title || index}
                 key={index}
                 onPress={() => navigation.navigate(action.screen)}
                 className="items-center gap-2 mb-4 w-[30%]"

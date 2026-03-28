@@ -15,6 +15,7 @@ export default function BottomNav() {
 
   return (
     <Tab.Navigator
+      id="main-tabs"
       backBehavior="history"
       screenOptions={{
         headerShown: false,

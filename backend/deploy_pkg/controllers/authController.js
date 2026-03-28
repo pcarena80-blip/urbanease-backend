@@ -12,6 +12,12 @@ const generateToken = (id) => {
     });
 };
 
+const generateRegistrationToken = (email) => {
+    return jwt.sign({ email, purpose: 'registration_verification' }, process.env.JWT_SECRET, {
+        expiresIn: '2h',
+    });
+};
+
 // Helper functions for validation
 const validateEmail = (email) => {
     // Regex for valid email structure and specific domains
@@ -122,7 +128,8 @@ const verifyRegistrationOtp = async (req, res) => {
         await record.save();
         console.log('[DEBUG] Email verified successfully');
 
-        res.json({ message: 'Email verified successfully', verified: true });
+        const registrationToken = generateRegistrationToken(email);
+        res.json({ message: 'Email verified successfully', verified: true, registrationToken });
     } catch (error) {
         console.error('[DEBUG] verifyRegistrationOtp Error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -133,7 +140,7 @@ const verifyRegistrationOtp = async (req, res) => {
 // @route   POST /api/auth/signup
 // @access  Public
 const registerUser = async (req, res) => {
-    let { name, fullName, email, phone, password } = req.body;
+    let { name, fullName, email, phone, password, registrationToken } = req.body;
 
     if (!name && fullName) name = fullName;
 
@@ -141,7 +148,7 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'Please add all fields' });
     }
 
-    email = email.toLowerCase();
+    email = email.trim().toLowerCase();
 
     // FINAL VALIDATION CHECK
     if (!validatePassword(password)) {
@@ -149,12 +156,25 @@ const registerUser = async (req, res) => {
     }
 
     try {
-        // Double check email verification status
-        const verificationRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+        let isEmailVerified = false;
 
-        // IMPORTANT: In production, enforce this. For now, if no record exists but we are testing, we might optionally skip. 
-        // But user said "No shortcuts". So we ENFORCE.
-        if (!verificationRecord) {
+        if (registrationToken) {
+            try {
+                const decoded = jwt.verify(registrationToken, process.env.JWT_SECRET);
+                if (decoded?.purpose === 'registration_verification' && decoded?.email === email) {
+                    isEmailVerified = true;
+                }
+            } catch (tokenError) {
+                console.warn('[DEBUG] Invalid registrationToken provided:', tokenError.message);
+            }
+        }
+
+        if (!isEmailVerified) {
+            const verificationRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+            isEmailVerified = !!verificationRecord;
+        }
+
+        if (!isEmailVerified) {
             return res.status(400).json({ message: 'Email not verified. Please verify using OTP first.' });
         }
 

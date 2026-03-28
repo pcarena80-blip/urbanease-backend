@@ -13,7 +13,7 @@ export default function PaymentHistory({ onNavigate }: { onNavigate: (screen: st
   return (
     <View className="h-full flex flex-col bg-gray-50">
       <View className="p-6" style={{
-        background: 'linear-gradient(135deg, #00c878 0%, #00e68a 100%)'
+        backgroundColor: '#00c878'
       }}>
         <TouchableOpacity onPress={() => onNavigate('bills')} className="text-white mb-4">
           <ArrowLeft className="w-6 h-6" />

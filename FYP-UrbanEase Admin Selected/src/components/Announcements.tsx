@@ -64,7 +64,20 @@ export function Announcements({ searchQuery = '' }: { searchQuery?: string }) {
 
   useEffect(() => {
     fetchNotices();
-  }, []);
+    const intervalId = window.setInterval(fetchNotices, 15000);
+    const handleFocus = () => {
+      fetchNotices();
+      if (activeTab === 'history') {
+        fetchHistoryNotices();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [activeTab]);
 
   useEffect(() => {
     if (activeTab === 'history' && historyNotices.length === 0) {

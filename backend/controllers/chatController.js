@@ -13,6 +13,10 @@ const getMessages = async (req, res) => {
         let query;
         if (userId === 'community') {
             query = { receiverId: 'community' };
+            // Support incremental fetch: ?since=<ISO timestamp>
+            if (req.query.since) {
+                query.timestamp = { $gt: new Date(req.query.since) };
+            }
         } else {
             query = {
                 $or: [

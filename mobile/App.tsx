@@ -41,7 +41,7 @@ const AppNavigator = () => {
     }
 
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Navigator id="root-stack" screenOptions={{ headerShown: false }}>
             {user ? (
                 <>
                     {/* Main App Flow wrapped in Bottom Nav */}

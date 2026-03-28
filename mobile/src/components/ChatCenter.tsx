@@ -30,7 +30,6 @@ export default function ChatCenter() {
 
   return (
     <View className="h-full flex flex-col bg-gray-50">
-      {/* Header */}
       <LinearGradient
         colors={['#003E2F', '#005C3C', '#027A4C']}
         className="px-6 pt-12 pb-6 rounded-b-[32px]"
@@ -48,7 +47,6 @@ export default function ChatCenter() {
         </Text>
       </LinearGradient>
 
-      {/* Tabs */}
       <View className="bg-white px-4 pt-4 pb-2 border-b border-gray-100">
         <View className="flex-row gap-2">
           <TouchableOpacity
@@ -101,15 +99,9 @@ export default function ChatCenter() {
         </View>
       </View>
 
-      {/* Content */}
       <View className="flex-1 bg-white">
         {activeTab === 'community' ? (
           <View className="flex-1">
-            {/* We can render the list of chats here if we want to show 'Enter Chat' buttons, 
-                 or directly the CommunityChat component. 
-                 The original code showed a button to ENTER community chat. 
-                 Let's stick to the original design: A button to enter the chat. 
-              */}
             <View className="px-6 py-6">
               <TouchableOpacity
                 onPress={() => navigation.navigate('CommunityChatDetail')}
@@ -125,7 +117,7 @@ export default function ChatCenter() {
                 </LinearGradient>
                 <View className="flex-1">
                   <Text className="text-gray-900 mb-1 text-base font-semibold">UrbanEase Community</Text>
-                  <Text className="text-gray-500 text-xs">256 members • Tap to open chat</Text>
+                  <Text className="text-gray-500 text-xs">256 members â€¢ Tap to open chat</Text>
                 </View>
                 {unreadCounts.community > 0 && (
                   <View className="bg-red-500 rounded-full px-2 py-0.5">
@@ -142,7 +134,3 @@ export default function ChatCenter() {
     </View>
   );
 }
-
-
-
-

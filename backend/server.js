@@ -76,6 +76,7 @@ app.use('/api/complaints', require('./routes/complaintRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/carpool', require('./routes/carpoolRoutes'));
+app.use('/api/jobAlerts', require('./routes/jobAlertsRoutes'));
 
 // Default Route
 app.get('/', (req, res) => {
@@ -131,6 +132,10 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-    console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+if (process.env.NODE_ENV !== 'production') {
+    server.listen(PORT, () => {
+        console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+    });
+}
+
+module.exports = app;

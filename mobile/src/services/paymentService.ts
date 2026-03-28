@@ -11,17 +11,17 @@ export const initiatePayment = async (billId: string, amount: number) => {
     try {
         console.log('Initiating payment:', { billId, amount });
 
-        const response = await api.post('/payment/create', {
+        const response = await api.bills.pay({
             billId,
             amount
         });
 
-        const { orderId, paymentUrl } = response.data;
+        const { orderId, paymentUrl } = response;
 
         return { orderId, paymentUrl };
     } catch (error: any) {
         console.error('Payment initiation failed:', error);
-        throw new Error(error.response?.data?.message || 'Failed to initiate payment');
+        throw new Error(error.message || 'Failed to initiate payment');
     }
 };
 
@@ -51,11 +51,10 @@ export const openPaymentGateway = async (paymentUrl: string) => {
  */
 export const checkPaymentStatus = async (orderId: string) => {
     try {
-        const response = await api.get(`/payment/status/${orderId}`);
-        return response.data.transaction;
+        throw new Error('Payment status polling is not wired in the mobile API client yet.');
     } catch (error: any) {
         console.error('Status check failed:', error);
-        throw new Error(error.response?.data?.message || 'Failed to check payment status');
+        throw new Error(error.message || 'Failed to check payment status');
     }
 };
 
@@ -67,14 +66,10 @@ export const checkPaymentStatus = async (orderId: string) => {
  */
 export const getPaymentHistory = async (status?: string, limit: number = 20) => {
     try {
-        const params: any = { limit };
-        if (status) params.status = status;
-
-        const response = await api.get('/payment/history', { params });
-        return response.data.transactions;
+        throw new Error('Payment history is not wired in the mobile API client yet.');
     } catch (error: any) {
         console.error('History fetch failed:', error);
-        throw new Error(error.response?.data?.message || 'Failed to fetch payment history');
+        throw new Error(error.message || 'Failed to fetch payment history');
     }
 };
 
@@ -137,7 +132,7 @@ export const pollPaymentStatus = async (
             attempts++;
 
             try {
-                const transaction = await checkPaymentStatus(orderId);
+                const transaction: any = await checkPaymentStatus(orderId);
 
                 // If payment completed (success or failed), stop polling
                 if (transaction.status === 'success' || transaction.status === 'failed' || transaction.status === 'cancelled') {

@@ -30,21 +30,16 @@ export default function PrivateChatDetail() {
 
         const setupSocket = async () => {
             try {
-                // Ensure connection
                 await socketService.connect();
 
-                // Listen for new messages
                 socketService.on('new_private_message', (newMsg: any) => {
                     console.log('[PrivateChat] Real-time message received:', newMsg);
 
-                    // Verify correct chat
                     if (newMsg.senderId === chat.id) {
                         setMessages(prev => {
-                            // Deduplicate just in case
                             if (prev.some(m => m.id === newMsg.id)) return prev;
                             return [...prev, newMsg];
                         });
-                        // Mark as read
                         api.chat.markAsRead(chat.id);
                     }
                 });
@@ -55,7 +50,6 @@ export default function PrivateChatDetail() {
 
         setupSocket();
 
-        // Polling fallback (every 10s)
         const interval = setInterval(loadMessages, 10000);
 
         return () => {
@@ -74,13 +68,12 @@ export default function PrivateChatDetail() {
         console.log('[PrivateChat] Initializing chat with ID:', chat.id);
         setIsLoading(true);
 
-        // Timeout promise to prevent infinite loading
         const timeout = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Request timed out')), 10000)
         );
 
         try {
-            const [msgs, counts] = await Promise.race([
+            const [msgs, counts] = await Promise.race<any>([
                 Promise.all([
                     api.chat.displayChatWindow(chat.id),
                     api.chat.requestChatCenter()
@@ -97,7 +90,6 @@ export default function PrivateChatDetail() {
             }
             setUnreadCount(count);
 
-            // Mark as read immediately
             await api.chat.markAsRead(chat.id);
         } catch (e) {
             console.error('[PrivateChat] Init failed or timed out:', e);
@@ -119,7 +111,6 @@ export default function PrivateChatDetail() {
             const data = await api.chat.displayChatWindow(chat.id);
             const messagesArray = Array.isArray(data) ? data : [];
 
-            // Only update if changes to avoid re-renders
             setMessages(prev => {
                 const prevIds = new Set(prev.map(m => m.id));
                 const hasChanges = messagesArray.some(m => !prevIds.has(m.id)) || messagesArray.length !== prev.length;
@@ -136,7 +127,6 @@ export default function PrivateChatDetail() {
 
     const loadUnreadCount = async () => {
         try {
-            // We can get the specific count for this chat by getting all counts
             const counts = await api.chat.requestChatCenter();
             if (counts.privateChats && counts.privateChats[chat.id]) {
                 setUnreadCount(counts.privateChats[chat.id]);
@@ -202,7 +192,6 @@ export default function PrivateChatDetail() {
     const handleSend = async () => {
         if (!messageText.trim() && !selectedImage) return;
 
-        // Optimistic update - add message immediately
         const optimisticId = `temp-${Date.now()}`;
         const tempMessage = {
             id: optimisticId,
@@ -227,7 +216,6 @@ export default function PrivateChatDetail() {
                     formData.append('message', tempMessage.message);
                 }
 
-                // Append file with robust filename/type
                 const filename = savedImage.uri.split('/').pop() || 'upload.jpg';
                 const match = /\.(\w+)$/.exec(filename);
                 const type = match ? `image/${match[1]}` : 'image/jpeg';
@@ -247,19 +235,16 @@ export default function PrivateChatDetail() {
                 });
             }
 
-            // Correctly remove the temp message when real one loads, or just reload all
-            // Ideally we replace the temp message with the real one, but reloading is safer for sync
             await loadMessages();
         } catch (error) {
             console.error('Send failed:', error);
-            // Remove optimistic message on failure
             setMessages(prev => prev.filter(m => m.id !== optimisticId));
             Alert.alert('Error', 'Failed to send message');
         }
     };
 
     const handleReportMessage = (msg: any) => {
-        console.log('📢 REPORT: Long-press detected on message:', msg.id || msg._id, 'isMe:', msg.senderId === user?._id);
+        console.log('ðŸ“¢ REPORT: Long-press detected on message:', msg.id || msg._id, 'isMe:', msg.senderId === user?._id);
         Alert.alert(
             'Report Message',
             'Why are you reporting this message?',
@@ -308,7 +293,6 @@ export default function PrivateChatDetail() {
 
         const messageBubble = (
             <View className={`max-w-[75%] ${isMe ? 'items-end' : 'items-start'}`}>
-                {/* Image Message */}
                 {hasImage && (
                     <TouchableOpacity
                         onPress={() => setViewerImage(api.getImageUrl(msg.attachment))}
@@ -330,7 +314,6 @@ export default function PrivateChatDetail() {
                     </TouchableOpacity>
                 )}
 
-                {/* Text Message */}
                 {hasMessage && (
                     <View
                         className={`p-3.5 ${isMe
@@ -344,7 +327,6 @@ export default function PrivateChatDetail() {
                     </View>
                 )}
 
-                {/* Timestamp */}
                 <Text className="text-gray-400 mt-1 text-[11px]">
                     {new Date(msg.timestamp || msg.createdAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </Text>
@@ -376,7 +358,6 @@ export default function PrivateChatDetail() {
                 keyboardVerticalOffset={0}
             >
                 <View className="flex-1">
-                    {/* Header */}
                     <LinearGradient
                         colors={['#003E2F', '#027A4C']}
                         start={{ x: 0, y: 0 }}
@@ -406,23 +387,19 @@ export default function PrivateChatDetail() {
                         </View>
                     </LinearGradient>
 
-                    {/* Unread Messages Banner */}
                     {unreadCount > 0 && (
                         <TouchableOpacity
                             onPress={() => {
-                                // Scroll logic would go here if we tracked specific message IDs
-                                // For now just mark as read
                                 markAsRead();
                             }}
                             className="bg-blue-500 py-2 px-4"
                         >
                             <Text className="text-white text-center font-medium">
-                                ↓ {unreadCount} unread message{unreadCount > 1 ? 's' : ''} from {chat.name}
+                                â†“ {unreadCount} unread message{unreadCount > 1 ? 's' : ''} from {chat.name}
                             </Text>
                         </TouchableOpacity>
                     )}
 
-                    {/* Messages */}
                     <FlatList
                         ref={flatListRef}
                         data={messages}
@@ -449,7 +426,6 @@ export default function PrivateChatDetail() {
                         }
                     />
 
-                    {/* Image Preview */}
                     {selectedImage && (
                         <View className="px-4 py-2 bg-gray-100 border-t border-gray-200">
                             <View className="relative w-20 h-20">
@@ -467,7 +443,6 @@ export default function PrivateChatDetail() {
                         </View>
                     )}
 
-                    {/* Input Bar - Now properly positioned with KeyboardAvoidingView */}
                     <View className="bg-white border-t border-gray-100 px-4 py-3">
                         <View className="flex-row items-center gap-3">
                             <TouchableOpacity
@@ -502,7 +477,6 @@ export default function PrivateChatDetail() {
                 </View>
             </KeyboardAvoidingView>
 
-            {/* Image Viewer */}
             {viewerImage && (
                 <ImageViewer
                     image={viewerImage}
@@ -512,7 +486,3 @@ export default function PrivateChatDetail() {
         </SafeAreaView>
     );
 }
-
-
-
-

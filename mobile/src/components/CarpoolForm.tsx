@@ -2,20 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, KeyboardAvoidingView, FlatList } from 'react-native';
 import { ArrowLeft, Car, Calendar, Clock, MapPin, Users, Plus, Trash2, ChevronDown } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BASE_URL } from '../services/api';
-
-// Profanity filter - basic list of offensive words
-const PROFANITY_LIST = [
-    'fuck', 'shit', 'ass', 'bitch', 'damn', 'bastard', 'crap',
-    'dick', 'piss', 'slut', 'whore', 'cock', 'pussy', 'fag',
-    'nigger', 'retard', 'idiot', 'stupid', 'moron', 'dumb'
-];
-
-const containsProfanity = (text: string): boolean => {
-    const lowerText = text.toLowerCase();
-    return PROFANITY_LIST.some(word => lowerText.includes(word));
-};
+import { api } from '../services/api';
 
 // Dropdown Component
 interface DropdownProps {
@@ -88,9 +75,9 @@ export default function CarpoolFormScreen() {
         vehicleNumber: '',
         seatingCapacity: '4',
         seatsAvailable: '3',
-        tripType: 'two-way' as 'one-way' | 'two-way', // NEW: Trip type
+        tripType: 'two-way' as 'one-way' | 'two-way',
         schedule: [] as { day: string, goingTime: string, goingPeriod: string, returnTime?: string, returnPeriod?: string }[],
-        pickupLocation: 'Urban E Society', // Fixed departure location
+        pickupLocation: 'Urban E Society',
         destination: ''
     });
 
@@ -104,29 +91,10 @@ export default function CarpoolFormScreen() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-    // Contact number validation - must be exactly 10 digits
     const handleContactChange = (text: string) => {
-        // Remove any non-digit characters
         const digits = text.replace(/\D/g, '');
-        // Limit to 10 digits
         const limited = digits.slice(0, 10);
         setFormData({ ...formData, contactNumber: limited });
-    };
-
-    const validateContact = (): boolean => {
-        if (formData.contactNumber.length !== 10) {
-            Alert.alert('Invalid Contact', 'Please enter exactly 10 digits after +92');
-            return false;
-        }
-        return true;
-    };
-
-    const validateVehicleName = (): boolean => {
-        if (containsProfanity(formData.vehicleName)) {
-            Alert.alert('Invalid Vehicle Name', 'Please remove inappropriate language from the vehicle name');
-            return false;
-        }
-        return true;
     };
 
     const addSlot = () => {
@@ -134,7 +102,6 @@ export default function CarpoolFormScreen() {
             Alert.alert('Error', 'Please select going time');
             return;
         }
-        // Return time only required for two-way trips
         if (formData.tripType === 'two-way' && !currentSlot.returnTime) {
             Alert.alert('Error', 'Please select return time for two-way trip');
             return;
@@ -170,8 +137,10 @@ export default function CarpoolFormScreen() {
             return;
         }
 
-        if (!validateContact()) return;
-        if (!validateVehicleName()) return;
+        if (formData.contactNumber.length !== 10) {
+            Alert.alert('Invalid Contact', 'Please enter exactly 10 digits after +92');
+            return;
+        }
 
         if (parseInt(formData.seatingCapacity) > 4) {
             Alert.alert('Error', 'Seating capacity cannot exceed 4');
@@ -179,42 +148,28 @@ export default function CarpoolFormScreen() {
         }
 
         if (formData.schedule.length === 0) {
-            Alert.alert('Error', `Please add at least one schedule slot${formData.tripType === 'two-way' ? ' with going and return times' : ''}`);
+            Alert.alert('Error', 'Please add at least one schedule slot');
             return;
         }
 
         setIsSubmitting(true);
         try {
-            const token = await AsyncStorage.getItem('token');
             const payload = {
                 ...formData,
                 contactNumber: `+92${formData.contactNumber}`,
                 seatingCapacity: parseInt(formData.seatingCapacity),
-                seatsAvailable: parseInt(formData.seatsAvailable),
-                tripType: formData.tripType // Include trip type
+                seatsAvailable: parseInt(formData.seatsAvailable)
             };
 
-            const response = await fetch(`${BASE_URL}/carpool`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(payload)
-            });
-
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || 'Failed to create listing');
-            }
-
+            await api.carpool.create(payload);
             Alert.alert('Success', 'Carpool listing created!', [
                 { text: 'OK', onPress: () => navigation.goBack() }
             ]);
 
         } catch (error: any) {
-            Alert.alert('Error', error.message);
+            if (error.message !== 'Not authorized') {
+                Alert.alert('Error', error.message || 'Failed to create listing');
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -261,7 +216,6 @@ export default function CarpoolFormScreen() {
                             <Text className="text-xs font-bold text-gray-500 uppercase">Vehicle (Max 4 Seats)</Text>
                         </View>
 
-                        {/* Vehicle Type - Dropdown */}
                         <View className="mb-3">
                             <Text className="text-xs text-gray-500 mb-1 ml-1">Vehicle Type</Text>
                             <Dropdown
@@ -272,43 +226,27 @@ export default function CarpoolFormScreen() {
                             />
                         </View>
 
-                        {/* Vehicle Name */}
                         <View className="mb-3">
                             <Text className="text-xs text-gray-500 mb-1 ml-1">Vehicle Name</Text>
                             <TextInput
                                 className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900"
                                 value={formData.vehicleName}
                                 onChangeText={text => setFormData({ ...formData, vehicleName: text })}
-                                placeholder="e.g. Honda City, Toyota Corolla"
+                                placeholder="e.g. Honda City"
                             />
                         </View>
 
-                        {/* Registration No & Capacity */}
                         <View className="flex-row gap-3 mb-3">
                             <View className="flex-1">
                                 <Text className="text-xs text-gray-500 mb-1 ml-1">Registration No.</Text>
                                 <TextInput
                                     className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900"
                                     value={formData.vehicleNumber}
-                                    onChangeText={text => {
-                                        // Format: ABC-123 (3 uppercase letters, dash, 3 digits)
-                                        const upper = text.toUpperCase();
-                                        const cleaned = upper.replace(/[^A-Z0-9-]/g, '');
-                                        // Extract letters and numbers separately
-                                        const letters = cleaned.replace(/[^A-Z]/g, '').substring(0, 3);
-                                        const numbers = cleaned.replace(/[^0-9]/g, '').substring(0, 3);
-                                        // Build formatted string
-                                        let formatted = letters;
-                                        if (letters.length === 3 && numbers.length > 0) {
-                                            formatted = letters + '-' + numbers;
-                                        }
-                                        setFormData({ ...formData, vehicleNumber: formatted });
-                                    }}
+                                    onChangeText={text => setFormData({ ...formData, vehicleNumber: text.toUpperCase() })}
                                     placeholder="ABC-123"
                                     autoCapitalize="characters"
                                     maxLength={7}
                                 />
-                                <Text className="text-xs text-gray-400 mt-0.5 ml-1">Format: ABC-123</Text>
                             </View>
                             <View className="flex-1">
                                 <Text className="text-xs text-gray-500 mb-1 ml-1">Capacity</Text>
@@ -322,7 +260,6 @@ export default function CarpoolFormScreen() {
                             </View>
                         </View>
 
-                        {/* Seats Available */}
                         <View>
                             <Text className="text-xs text-gray-500 mb-1 ml-1">Seats Available</Text>
                             <TextInput
@@ -335,7 +272,7 @@ export default function CarpoolFormScreen() {
                         </View>
                     </View>
 
-                    {/* Trip Type Selector - NEW */}
+                    {/* Trip Type */}
                     <View className="bg-white p-4 rounded-2xl mb-4 shadow-sm border border-gray-100">
                         <View className="flex-row items-center gap-2 mb-3">
                             <MapPin size={16} color="#6B7280" />
@@ -348,7 +285,6 @@ export default function CarpoolFormScreen() {
                             >
                                 <Text className="text-xl mb-1">🔄</Text>
                                 <Text className={`font-semibold ${formData.tripType === 'two-way' ? 'text-[#027A4C]' : 'text-gray-600'}`}>Two-Way</Text>
-                                <Text className="text-xs text-gray-400 mt-1">Going & Return</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 onPress={() => setFormData({ ...formData, tripType: 'one-way', schedule: [] })}
@@ -356,21 +292,17 @@ export default function CarpoolFormScreen() {
                             >
                                 <Text className="text-xl mb-1">➡️</Text>
                                 <Text className={`font-semibold ${formData.tripType === 'one-way' ? 'text-[#027A4C]' : 'text-gray-600'}`}>One-Way</Text>
-                                <Text className="text-xs text-gray-400 mt-1">Going Only</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
 
-                    {/* Dynamic Schedule */}
+                    {/* Schedule */}
                     <View className="bg-white p-4 rounded-2xl mb-4 shadow-sm border border-gray-100">
                         <View className="flex-row items-center gap-2 mb-3">
                             <Calendar size={16} color="#6B7280" />
-                            <Text className="text-xs font-bold text-gray-500 uppercase">
-                                Schedule {formData.tripType === 'two-way' ? '(Going & Return)' : '(Going Only)'}
-                            </Text>
+                            <Text className="text-xs font-bold text-gray-500 uppercase">Schedule</Text>
                         </View>
 
-                        {/* Day Selector */}
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4">
                             {days.map(day => (
                                 <TouchableOpacity
@@ -378,19 +310,15 @@ export default function CarpoolFormScreen() {
                                     onPress={() => setCurrentSlot(prev => ({ ...prev, day }))}
                                     className={`mr-2 px-4 py-2 rounded-lg ${currentSlot.day === day ? 'bg-[#027A4C]' : 'bg-gray-100'}`}
                                 >
-                                    <Text className={`text-sm font-medium ${currentSlot.day === day ? 'text-white' : 'text-gray-600'}`}>
-                                        {day}
-                                    </Text>
+                                    <Text className={`text-sm font-medium ${currentSlot.day === day ? 'text-white' : 'text-gray-600'}`}>{day}</Text>
                                 </TouchableOpacity>
                             ))}
                         </ScrollView>
 
-                        {/* Going Time */}
                         <View className="mb-4">
-                            <Text className="text-xs font-semibold text-[#027A4C] mb-2">🚗 DEPARTURE (Going)</Text>
+                            <Text className="text-xs text-gray-500 mb-1">Going Time</Text>
                             <View className="flex-row gap-2">
                                 <View className="flex-1">
-                                    <Text className="text-xs text-gray-500 mb-1">Time</Text>
                                     <Dropdown
                                         value={currentSlot.goingTime}
                                         options={TIME_OPTIONS}
@@ -399,7 +327,6 @@ export default function CarpoolFormScreen() {
                                     />
                                 </View>
                                 <View className="w-20">
-                                    <Text className="text-xs text-gray-500 mb-1">AM/PM</Text>
                                     <Dropdown
                                         value={currentSlot.goingPeriod}
                                         options={PERIOD_OPTIONS}
@@ -410,13 +337,11 @@ export default function CarpoolFormScreen() {
                             </View>
                         </View>
 
-                        {/* Return Time - Only for two-way trips */}
                         {formData.tripType === 'two-way' && (
                             <View className="mb-4">
-                                <Text className="text-xs font-semibold text-orange-600 mb-2">🏠 RETURN (Coming Back)</Text>
+                                <Text className="text-xs text-gray-500 mb-1">Return Time</Text>
                                 <View className="flex-row gap-2">
                                     <View className="flex-1">
-                                        <Text className="text-xs text-gray-500 mb-1">Time</Text>
                                         <Dropdown
                                             value={currentSlot.returnTime}
                                             options={TIME_OPTIONS}
@@ -425,7 +350,6 @@ export default function CarpoolFormScreen() {
                                         />
                                     </View>
                                     <View className="w-20">
-                                        <Text className="text-xs text-gray-500 mb-1">AM/PM</Text>
                                         <Dropdown
                                             value={currentSlot.returnPeriod}
                                             options={PERIOD_OPTIONS}
@@ -437,28 +361,22 @@ export default function CarpoolFormScreen() {
                             </View>
                         )}
 
-                        {/* Add Slot Button */}
                         <TouchableOpacity
                             onPress={addSlot}
                             className="bg-[#027A4C] py-3 rounded-xl items-center flex-row justify-center gap-2 mb-4"
                         >
                             <Plus size={20} color="white" />
-                            <Text className="text-white font-semibold">Add Schedule for {currentSlot.day}</Text>
+                            <Text className="text-white font-semibold">Add Slot</Text>
                         </TouchableOpacity>
 
-                        {/* Slots List */}
                         {formData.schedule.length > 0 && (
                             <View className="border-t border-gray-100 pt-3">
-                                <Text className="text-xs font-bold text-gray-500 mb-2">ADDED SCHEDULES:</Text>
                                 {formData.schedule.map((slot, index) => (
                                     <View key={index} className="flex-row items-center justify-between bg-gray-50 p-3 rounded-xl mb-2">
                                         <View>
                                             <Text className="text-gray-900 font-semibold">{slot.day}</Text>
                                             <Text className="text-xs text-gray-600">
-                                                {formData.tripType === 'two-way'
-                                                    ? `Go: ${slot.goingTime} ${slot.goingPeriod} → Return: ${slot.returnTime} ${slot.returnPeriod}`
-                                                    : `Going: ${slot.goingTime} ${slot.goingPeriod} (One-Way)`
-                                                }
+                                                {slot.goingTime} {slot.goingPeriod} {slot.returnTime ? `→ ${slot.returnTime} ${slot.returnPeriod}` : ''}
                                             </Text>
                                         </View>
                                         <TouchableOpacity onPress={() => removeSlot(index)}>
@@ -477,18 +395,17 @@ export default function CarpoolFormScreen() {
                             <Text className="text-xs font-bold text-gray-500 uppercase">Route</Text>
                         </View>
                         <View className="mb-3">
-                            <Text className="text-xs text-gray-500 mb-1 ml-1">Departure Location (Fixed)</Text>
-                            <View className="w-full px-4 py-3 rounded-xl bg-[#027A4C]/10 border border-[#027A4C]/30 flex-row items-center">
+                            <Text className="text-xs text-gray-500 mb-1 ml-1">Departure (Fixed)</Text>
+                            <View className="px-4 py-3 rounded-xl bg-[#027A4C]/10 border border-[#027A4C]/30 flex-row items-center">
                                 <MapPin size={16} color="#027A4C" />
                                 <Text className="text-[#027A4C] font-semibold ml-2">{formData.pickupLocation}</Text>
                             </View>
-                            <Text className="text-xs text-gray-400 mt-1 ml-1">All carpools depart from Urban E Society</Text>
                         </View>
                         <View>
                             <Text className="text-xs text-gray-500 mb-1 ml-1">Destination</Text>
                             <TextInput
                                 className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900"
-                                placeholder="Enter your destination"
+                                placeholder="Enter destination"
                                 value={formData.destination}
                                 onChangeText={text => setFormData({ ...formData, destination: text })}
                             />
@@ -497,8 +414,7 @@ export default function CarpoolFormScreen() {
 
                 </ScrollView>
 
-                {/* Fixed Submit Button - Always visible above keyboard */}
-                <View className="px-4 pb-24 pt-2 bg-gray-50 border-t border-gray-200">
+                <View className="px-4 pb-10 pt-2 bg-gray-50 border-t border-gray-200">
                     <TouchableOpacity
                         onPress={handleSubmit}
                         disabled={isSubmitting}
@@ -513,7 +429,3 @@ export default function CarpoolFormScreen() {
         </View>
     );
 }
-
-
-
-

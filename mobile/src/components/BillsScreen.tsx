@@ -70,7 +70,7 @@ export default function BillsScreen() {
 
     setPaying(true);
     try {
-      const response = await api.bills.pay({
+      const response = await api.bills.pay(selectedBill._id, {
         referenceId: selectedBill.referenceId,
         amount: selectedBill.amount,
         paymentMethod: paymentMethod,

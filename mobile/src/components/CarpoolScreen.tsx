@@ -4,7 +4,7 @@ import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet,
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { ArrowLeft, User, Car, Clock, Phone, MapPin, Plus, Trash2, Search, X, Flag } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BASE_URL } from '../services/api';
+import { api } from '../services/api';
 
 interface CarpoolListing {
     _id: string;
@@ -32,7 +32,7 @@ export default function CarpoolScreen() {
     const navigation = useNavigation<any>();
     const [listings, setListings] = useState<CarpoolListing[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isRefreshing, setIsRefreshing] = useState(false); // Valid state
+    const [isRefreshing, setIsRefreshing] = useState(false);
     const [visibleContacts, setVisibleContacts] = useState<{ [key: string]: boolean }>({});
     const [currentUserId, setCurrentUserId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -41,7 +41,6 @@ export default function CarpoolScreen() {
         listing.destination?.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    // Auto-refresh when screen comes into focus
     useFocusEffect(
         React.useCallback(() => {
             fetchListings();
@@ -60,24 +59,19 @@ export default function CarpoolScreen() {
     };
 
     const fetchListings = async () => {
-        // Only show full loader if lists are empty (initial load)
         if (listings.length === 0) setIsLoading(true);
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`${BASE_URL}/carpool`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const data = await response.json();
+            const data = await api.carpool.getAll();
             if (Array.isArray(data)) {
                 setListings(data);
             } else {
                 setListings([]);
             }
-        } catch (error) {
+        } catch (error: any) {
             console.error('Failed to load carpool listings', error);
-            Alert.alert('Error', 'Failed to load carpool listings');
+            if (error.message !== 'Not authorized') {
+                Alert.alert('Error', 'Failed to load carpool listings');
+            }
         } finally {
             setIsLoading(false);
             setIsRefreshing(false);
@@ -107,22 +101,13 @@ export default function CarpoolScreen() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            const token = await AsyncStorage.getItem('token');
-                            const response = await fetch(`${BASE_URL}/carpool/${id}`, {
-                                method: 'DELETE',
-                                headers: {
-                                    'Authorization': `Bearer ${token}`
-                                }
-                            });
-
-                            if (response.ok) {
-                                Alert.alert('Success', 'Listing removed');
-                                setListings(prev => prev.filter(item => item._id !== id));
-                            } else {
+                            await api.carpool.delete(id);
+                            Alert.alert('Success', 'Listing removed');
+                            setListings(prev => prev.filter(item => item._id !== id));
+                        } catch (error: any) {
+                             if (error.message !== 'Not authorized') {
                                 Alert.alert('Error', 'Failed to remove listing');
-                            }
-                        } catch (error) {
-                            Alert.alert('Error', 'Error removing listing');
+                             }
                         }
                     }
                 }
@@ -145,25 +130,12 @@ export default function CarpoolScreen() {
 
     const submitReport = async (id: string, reason: string) => {
         try {
-            const token = await AsyncStorage.getItem('token');
-            const response = await fetch(`${BASE_URL}/carpool/${id}/report`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({ reason })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                Alert.alert('Report Submitted', 'Thank you for keeping the community safe.');
-            } else {
-                Alert.alert('Error', data.message || 'Failed to submit report');
+            await api.carpool.report(id, reason);
+            Alert.alert('Report Submitted', 'Thank you for keeping the community safe.');
+        } catch (error: any) {
+            if (error.message !== 'Not authorized') {
+                Alert.alert('Error', error.message || 'Failed to submit report');
             }
-        } catch (error) {
-            Alert.alert('Error', 'Network error while reporting');
         }
     };
 
@@ -290,7 +262,6 @@ export default function CarpoolScreen() {
                 </TouchableOpacity>
             </View>
 
-            {/* Search Bar */}
             <View className="px-4 pb-4 bg-white border-b border-gray-100 z-10">
                 <View className="flex-row items-center bg-gray-100 rounded-xl px-4 py-3 border border-gray-200">
                     <Search size={20} color="#9CA3AF" />
@@ -330,7 +301,3 @@ export default function CarpoolScreen() {
         </View>
     );
 }
-
-
-
-

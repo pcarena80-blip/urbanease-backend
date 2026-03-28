@@ -18,6 +18,7 @@ import {
 } from "lucide-react-native";
 import { LinearGradient } from 'expo-linear-gradient';
 import { useNavigation } from '@react-navigation/native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api } from '../services/api';
 import StatusModal from './common/StatusModal';
 
@@ -138,6 +139,7 @@ For any questions regarding these Terms or Privacy Policy, please contact the So
 
 export default function SignupScreen() {
   const navigation = useNavigation<any>();
+  const insets = useSafeAreaInsets();
   const [formData, setFormData] = useState({
     fullName: "",
     email: "",
@@ -158,6 +160,8 @@ export default function SignupScreen() {
 
   // Verification States
   const [isEmailVerified, setIsEmailVerified] = useState(false);
+  const [verifiedEmail, setVerifiedEmail] = useState("");
+  const [registrationToken, setRegistrationToken] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
@@ -186,6 +190,73 @@ export default function SignupScreen() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [modal, setModal] = useState({ visible: false, type: 'success' as 'success' | 'error', title: '', message: '' });
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const validationAlertLockRef = useRef(false);
+
+  const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+  const validateField = (name: string, value: string, currentFormData = formData) => {
+    let error = "";
+    if (name === "fullName" && !value.trim()) error = "Full Name is required";
+    if (name === "email") {
+      if (!value) error = "Email is required";
+      else if (!/^[a-zA-Z0-9._%+-]+@(gmail\.com|outlook\.com|yahoo\.com|hotmail\.com|icloud\.com)$/.test(value.toLowerCase())) {
+        error = "Use a valid email (gmail, outlook, etc.)";
+      }
+    }
+    if (name === "cnic") {
+      const digits = value.replace(/\D/g, '');
+      if (!value) error = "CNIC is required";
+      else if (digits.length < 13) error = "CNIC must be 13 digits";
+    }
+    if (name === "phone") {
+      const phoneDigits = value.replace(/\D/g, '');
+      if (!value || phoneDigits.length < 12) error = "Phone must be +92 followed by 10 digits";
+    }
+    if (name === "password") {
+      if (!value) error = "Password is required";
+      else if (value.length < 8) error = "Must be at least 8 characters";
+      else if (!/(?=.*[A-Z])/.test(value)) error = "Uppercase letter missing";
+      else if (!/(?=.*[a-z])/.test(value)) error = "Lowercase letter missing";
+      else if (!/(?=.*\d)/.test(value)) error = "Number missing";
+      else if (!/(?=.*[@$!%*?&])/.test(value)) error = "Special character missing";
+    }
+    if (name === "confirmPassword") {
+      if (value !== currentFormData.password) error = "Passwords do not match";
+    }
+    if (name === "block" && currentFormData.propertyType === "house" && !value) error = "Required";
+    if (name === "street" && currentFormData.propertyType === "house" && !value) error = "Required";
+    if (name === "houseNo" && currentFormData.propertyType === "house" && !value) error = "Required";
+    if (name === "plazaName" && currentFormData.propertyType === "apartment" && !value) error = "Required";
+    if (name === "floorNumber" && currentFormData.propertyType === "apartment" && !value) error = "Required";
+    if (name === "flatNumber" && currentFormData.propertyType === "apartment" && !value) error = "Required";
+
+    setErrors(prev => ({ ...prev, [name]: error }));
+    return error;
+  };
+
+  const handleFieldChange = (name: string, value: string) => {
+    const newFormData = { ...formData, [name]: value };
+    setFormData(newFormData);
+    validateField(name, value, newFormData);
+  };
+
+  const resetEmailVerificationState = () => {
+    setIsEmailVerified(false);
+    setVerifiedEmail("");
+    setRegistrationToken("");
+    setIsOtpSent(false);
+    setOtp("");
+    setTimer(60);
+  };
+
+  const handleEmailChange = (text: string) => {
+    const nextEmail = text;
+    setFormData(prev => ({ ...prev, email: nextEmail }));
+    if (normalizeEmail(nextEmail) !== verifiedEmail) {
+      resetEmailVerificationState();
+    }
+  };
 
 
 
@@ -201,6 +272,19 @@ export default function SignupScreen() {
     if (modal.type === 'success') {
       navigation.navigate('Login');
     }
+  };
+
+  const showValidationAlert = (title: string, message: string) => {
+    if (validationAlertLockRef.current) return;
+    validationAlertLockRef.current = true;
+    Alert.alert(title, message, [
+      {
+        text: 'OK',
+        onPress: () => {
+          validationAlertLockRef.current = false;
+        }
+      }
+    ]);
   };
 
   // Phone number handler - Fixed +92 prefix with exactly 10 digits
@@ -244,19 +328,31 @@ export default function SignupScreen() {
   };
 
   const handleSendOtp = async () => {
-    if (!formData.email) {
-      Alert.alert('Error', 'Please enter email address');
+    if (otpLoading) return;
+
+    const normalizedEmail = normalizeEmail(formData.email);
+    const fullName = formData.fullName.trim();
+
+    if (!fullName) {
+      showValidationAlert('Error', 'Please enter your full name first');
+      validateField('fullName', fullName);
+      return;
+    }
+
+    if (!normalizedEmail) {
+      showValidationAlert('Error', 'Please enter email address');
       return;
     }
     const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|outlook\.com|yahoo\.com|hotmail\.com|icloud\.com)$/;
-    if (!emailRegex.test(formData.email.toLowerCase())) {
-      Alert.alert('Error', 'Please use a valid email address (gmail.com, outlook.com, etc.)');
+    if (!emailRegex.test(normalizedEmail)) {
+      showValidationAlert('Error', 'Please use a valid email address (gmail.com, outlook.com, etc.)');
       return;
     }
 
     setOtpLoading(true);
     try {
-      await api.auth.sendOtp(formData.email);
+      setFormData(prev => ({ ...prev, email: normalizedEmail }));
+      await api.auth.sendOtp(normalizedEmail);
       setIsOtpSent(true);
       setTimer(60); // Start 60s timer
       Alert.alert('Success', 'OTP sent to your email');
@@ -268,18 +364,25 @@ export default function SignupScreen() {
   };
 
   const handleVerifyOtp = async () => {
+    if (otpLoading) return;
+
+    const normalizedEmail = normalizeEmail(formData.email);
+
     if (!otp || otp.length < 6) {
-      Alert.alert('Error', 'Enter valid 6-digit OTP');
+      showValidationAlert('Error', 'Enter valid 6-digit OTP');
       return;
     }
     if (timer === 0) {
-      Alert.alert('Error', 'OTP has expired. Please tap Resend to get a new code.');
+      showValidationAlert('Error', 'OTP has expired. Please tap Resend to get a new code.');
       return;
     }
     setOtpLoading(true);
     try {
-      await api.auth.verifyOtp(formData.email, otp);
+      const response = await api.auth.verifyOtp(normalizedEmail, otp.trim());
+      setFormData(prev => ({ ...prev, email: normalizedEmail }));
       setIsEmailVerified(true);
+      setVerifiedEmail(normalizedEmail);
+      setRegistrationToken(response?.registrationToken || "");
       setIsOtpSent(false);
       if (countdownRef.current) clearInterval(countdownRef.current);
       Alert.alert('Success', 'Email Verified Successfully!');
@@ -291,64 +394,50 @@ export default function SignupScreen() {
   };
 
   const handleSubmit = async () => {
-    if (!isEmailVerified) {
-      Alert.alert('Error', 'Please verify your email first');
+    if (isLoading) return;
+
+    const normalizedEmail = normalizeEmail(formData.email);
+
+    if (!isEmailVerified || verifiedEmail !== normalizedEmail) {
+      showValidationAlert('Error', 'Please verify your email first');
       return;
     }
 
-    if (!formData.fullName || !formData.password || !formData.cnic) {
-      Alert.alert('Error', 'Please fill in required fields');
-      return;
+    // Run validation on all fields
+    const keysToValidate = ['fullName', 'cnic', 'phone', 'password', 'confirmPassword'];
+    if (formData.propertyType === 'house') {
+      keysToValidate.push('block', 'street', 'houseNo');
+    } else {
+      keysToValidate.push('plazaName', 'floorNumber', 'flatNumber');
     }
-
-    // Phone validation - must be exactly +92 followed by 10 digits
-    if (!validatePhone()) {
-      Alert.alert('Error', 'Phone number must be +92 followed by exactly 10 digits');
+    let hasError = false;
+    for (const key of keysToValidate) {
+      const error = validateField(key, (formData as any)[key]);
+      if (error) hasError = true;
+    }
+    if (hasError) {
+      showValidationAlert('Error', 'Please fix the highlighted errors');
       return;
     }
 
     // Terms and Privacy must be read and agreed
     if (!hasReadTerms || !hasReadPrivacy) {
-      Alert.alert('Error', 'Please read both Terms & Conditions and Privacy Policy before agreeing');
+      showValidationAlert('Error', 'Please read both Terms & Conditions and Privacy Policy before agreeing');
       return;
     }
 
     if (!formData.agreeTerms) {
-      Alert.alert('Error', 'You must agree to Terms & Conditions and Privacy Policy');
+      showValidationAlert('Error', 'You must agree to Terms & Conditions and Privacy Policy');
       return;
-    }
-
-    // Strict Password Validation
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!passwordRegex.test(formData.password)) {
-      Alert.alert('Error', 'Password must be at least 8 chars, include uppercase, number, and special character');
-      return;
-    }
-
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
-      return;
-    }
-
-    // Block/Street/House validation (only for house property type)
-    if (formData.propertyType === 'house') {
-      if (!formData.block || !/^[A-Z]$/.test(formData.block)) {
-        Alert.alert('Error', 'Block / Sector must be a single letter (A-Z)');
-        return;
-      }
-      if (!formData.street || !/^\d{1,3}$/.test(formData.street)) {
-        Alert.alert('Error', 'Street must be a number (1-3 digits)');
-        return;
-      }
-      if (!formData.houseNo || !/^\d{1,3}$/.test(formData.houseNo)) {
-        Alert.alert('Error', 'House number must be a number (1-3 digits)');
-        return;
-      }
     }
 
     setIsLoading(true);
     try {
-      await api.auth.signup(formData);
+      await api.auth.submitSignUpForm({
+        ...formData,
+        email: normalizedEmail,
+        registrationToken,
+      });
       setModal({
         visible: true,
         type: 'success',
@@ -367,13 +456,26 @@ export default function SignupScreen() {
     }
   };
 
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@(gmail\.com|outlook\.com|yahoo\.com|hotmail\.com|icloud\.com)$/;
+  const normalizedEmail = normalizeEmail(formData.email);
+  const isNameReadyForOtp = formData.fullName.trim().length > 0;
+  const isEmailReadyForOtp = isNameReadyForOtp && emailRegex.test(normalizedEmail) && !otpLoading && !isOtpSent && !isEmailVerified;
+  const isOtpReadyToSubmit = otp.trim().length === 6 && timer > 0 && !otpLoading;
+  const canAttemptSignup =
+    !isLoading &&
+    isEmailVerified &&
+    verifiedEmail === normalizedEmail &&
+    hasReadTerms &&
+    hasReadPrivacy &&
+    formData.agreeTerms;
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       className="flex-1"
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView className="h-full bg-gray-50" contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }}>
+      <ScrollView className="h-full bg-gray-50" contentContainerStyle={{ flexGrow: 1, paddingBottom: 100 }} keyboardShouldPersistTaps="handled">
         {/* Top Section */}
         <View className="pt-12 pb-6 px-8 flex items-center bg-gray-50 z-10">
           <LinearGradient
@@ -393,17 +495,21 @@ export default function SignupScreen() {
 
               {/* Full Name */}
               <View>
-                <Text className="text-gray-700 mb-2 text-xs font-medium">Full Name</Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                  <Text className="text-gray-700 text-xs font-medium">Full Name</Text>
+                  {errors.fullName ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.fullName}</Text> : null}
+                </View>
                 <View className="relative">
                   <View className="absolute left-3 top-3.5 z-10">
-                    <User size={16} color="#9CA3AF" strokeWidth={1.5} />
+                    <User size={16} color={errors.fullName ? '#EF4444' : '#9CA3AF'} strokeWidth={1.5} />
                   </View>
                   <TextInput
                     value={formData.fullName}
-                    onChangeText={(text) => setFormData({ ...formData, fullName: text })}
+                    onChangeText={(text) => handleFieldChange('fullName', text)}
                     placeholder="Enter your full name"
-                    className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl bg-white"
-                    style={{ fontSize: 14 }}
+                    editable={!isOtpSent && !isEmailVerified}
+                    className="w-full pl-10 pr-3 py-3 border rounded-xl bg-white"
+                    style={{ fontSize: 14, borderColor: errors.fullName ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                   />
                 </View>
               </View>
@@ -418,7 +524,7 @@ export default function SignupScreen() {
                     </View>
                     <TextInput
                       value={formData.email}
-                      onChangeText={(text) => setFormData({ ...formData, email: text })}
+                      onChangeText={handleEmailChange}
                       placeholder="Enter your email"
                       editable={!isEmailVerified && !isOtpSent} // Lock if verified or OTP sent (until cancelled)
                       className={`w-full pl-10 pr-3 py-3 border rounded-xl ${isEmailVerified ? 'bg-green-50 border-green-200 text-green-800' : 'bg-white border-gray-200'}`}
@@ -435,8 +541,8 @@ export default function SignupScreen() {
                   {!isEmailVerified && !isOtpSent && (
                     <TouchableOpacity
                       onPress={handleSendOtp}
-                      disabled={otpLoading}
-                      className="bg-[#027A4C] px-4 rounded-xl justify-center items-center h-[50px]"
+                      disabled={!isEmailReadyForOtp}
+                      className={`px-4 rounded-xl justify-center items-center h-[50px] ${isEmailReadyForOtp ? 'bg-[#027A4C]' : 'bg-gray-300'}`}
                     >
                       {otpLoading ? <ActivityIndicator color="white" size="small" /> : <Text className="text-white font-medium text-xs">Verify</Text>}
                     </TouchableOpacity>
@@ -456,6 +562,7 @@ export default function SignupScreen() {
                         <TouchableOpacity
                           onPress={() => {
                             setOtp('');
+                            setVerifiedEmail('');
                             handleSendOtp();
                           }}
                           className="px-3 py-1.5 rounded-md bg-[#027A4C]"
@@ -475,17 +582,23 @@ export default function SignupScreen() {
                     />
                     <View className="flex-row gap-3">
                       <TouchableOpacity
-                        onPress={() => { setIsOtpSent(false); setOtp(''); setTimer(60); }}
+                        onPress={() => {
+                          setIsOtpSent(false);
+                          setOtp('');
+                          setTimer(60);
+                          setVerifiedEmail('');
+                          setIsEmailVerified(false);
+                        }}
                         className="flex-1 py-3 bg-gray-200 rounded-lg items-center"
                       >
                         <Text className="text-gray-600 font-medium text-xs">Change Email</Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={handleVerifyOtp}
-                        disabled={otpLoading || timer === 0}
-                        className={`flex-1 py-3 rounded-lg items-center ${timer > 0 ? 'bg-[#027A4C]' : 'bg-gray-300'}`}
+                        disabled={!isOtpReadyToSubmit}
+                        className={`flex-1 py-3 rounded-lg items-center ${isOtpReadyToSubmit ? 'bg-[#027A4C]' : 'bg-gray-300'}`}
                       >
-                        {otpLoading ? <ActivityIndicator color="white" size="small" /> : <Text className={`font-bold text-xs ${timer > 0 ? 'text-white' : 'text-gray-500'}`}>Submit OTP</Text>}
+                        {otpLoading ? <ActivityIndicator color="white" size="small" /> : <Text className={`font-bold text-xs ${isOtpReadyToSubmit ? 'text-white' : 'text-gray-500'}`}>Submit OTP</Text>}
                       </TouchableOpacity>
                     </View>
                   </View>
@@ -496,10 +609,13 @@ export default function SignupScreen() {
               {isEmailVerified && (
                 <View style={{ gap: 16 }}>
                   <View>
-                    <Text className="text-gray-700 mb-2 text-xs font-medium">CNIC Number</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text className="text-gray-700 text-xs font-medium">CNIC Number</Text>
+                      {errors.cnic ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.cnic}</Text> : null}
+                    </View>
                     <View className="relative">
                       <View className="absolute left-3 top-3.5 z-10">
-                        <CreditCard size={16} color="#9CA3AF" strokeWidth={1.5} />
+                        <CreditCard size={16} color={errors.cnic ? '#EF4444' : '#9CA3AF'} strokeWidth={1.5} />
                       </View>
                       <TextInput
                         value={formData.cnic}
@@ -508,29 +624,43 @@ export default function SignupScreen() {
                           let formatted = digits;
                           if (digits.length > 5) formatted = `${digits.slice(0, 5)}-${digits.slice(5)}`;
                           if (digits.length > 12) formatted = `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12)}`;
-                          setFormData({ ...formData, cnic: formatted });
+                          const newFormData = { ...formData, cnic: formatted };
+                          setFormData(newFormData);
+                          validateField('cnic', formatted, newFormData);
                         }}
                         keyboardType="numeric"
                         placeholder="XXXXX-XXXXXXX-X"
-                        className="w-full pl-10 pr-3 py-3 border border-gray-200 rounded-xl bg-white text-gray-900"
-                        style={{ fontSize: 14 }}
+                        className="w-full pl-10 pr-3 py-3 border rounded-xl bg-white text-gray-900"
+                        style={{ fontSize: 14, borderColor: errors.cnic ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                       />
                     </View>
                   </View>
 
                   <View>
-                    <Text className="text-gray-700 mb-2 text-xs font-medium">Phone Number</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text className="text-gray-700 text-xs font-medium">Phone Number</Text>
+                      {errors.phone ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.phone}</Text> : null}
+                    </View>
                     <View className="relative">
                       <View className="absolute left-3 top-3.5 z-10">
-                        <Phone size={16} color="#9CA3AF" strokeWidth={1.5} />
+                        <Phone size={16} color={errors.phone ? '#EF4444' : '#9CA3AF'} strokeWidth={1.5} />
                       </View>
                       <TextInput
                         value={formData.phone || '+92'}
-                        onChangeText={handlePhoneChange}
+                        onChangeText={(text) => {
+                          handlePhoneChange(text);
+                          // Validate after a tick so formData is updated
+                          setTimeout(() => {
+                            const phoneDigits = text.replace(/\D/g, '');
+                            let phoneErr = '';
+                            if (phoneDigits.length < 12) phoneErr = 'Phone must be +92 followed by 10 digits';
+                            setErrors(prev => ({ ...prev, phone: phoneErr }));
+                          }, 0);
+                        }}
                         placeholder="+92 301-0816789"
                         keyboardType="phone-pad"
-                        className="w-full pl-10 pr-10 py-3 border border-gray-200 rounded-xl bg-white"
-                        style={{ fontSize: 14 }}
+                        className="w-full pl-10 pr-10 py-3 border rounded-xl bg-white"
+                        style={{ fontSize: 14, borderColor: errors.phone ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                         maxLength={15}
                       />
                       {formData.phone && formData.phone.replace(/\D/g, '').length === 12 && (
@@ -581,84 +711,108 @@ export default function SignupScreen() {
                   {formData.propertyType === 'house' ? (
                     <View className="flex-row gap-3">
                       <View className="flex-1">
-                        <Text className="text-gray-700 mb-2 text-xs font-medium">Block / Sector</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text className="text-gray-700 text-xs font-medium">Block / Sector</Text>
+                          {errors.block ? <Text style={{ color: '#EF4444', fontSize: 9 }}>{errors.block}</Text> : null}
+                        </View>
                         <TextInput
                           value={formData.block}
                           onChangeText={text => {
                             const letter = text.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 1);
-                            setFormData({ ...formData, block: letter });
+                            handleFieldChange('block', letter);
                           }}
                           placeholder="A"
                           maxLength={1}
                           autoCapitalize="characters"
-                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
-                          style={{ fontSize: 14 }}
+                          className="w-full px-3 py-3 border rounded-xl bg-white"
+                          style={{ fontSize: 14, borderColor: errors.block ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                         />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-gray-700 mb-2 text-xs font-medium">Street</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text className="text-gray-700 text-xs font-medium">Street</Text>
+                          {errors.street ? <Text style={{ color: '#EF4444', fontSize: 9 }}>{errors.street}</Text> : null}
+                        </View>
                         <TextInput
                           value={formData.street}
                           onChangeText={text => {
                             const digits = text.replace(/\D/g, '').slice(0, 3);
-                            setFormData({ ...formData, street: digits });
+                            handleFieldChange('street', digits);
                           }}
                           placeholder="1"
                           maxLength={3}
                           keyboardType="number-pad"
-                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
-                          style={{ fontSize: 14 }}
+                          className="w-full px-3 py-3 border rounded-xl bg-white"
+                          style={{ fontSize: 14, borderColor: errors.street ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                         />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-gray-700 mb-2 text-xs font-medium">House</Text>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text className="text-gray-700 text-xs font-medium">House</Text>
+                          {errors.houseNo ? <Text style={{ color: '#EF4444', fontSize: 9 }}>{errors.houseNo}</Text> : null}
+                        </View>
                         <TextInput
                           value={formData.houseNo}
                           onChangeText={text => {
                             const digits = text.replace(/\D/g, '').slice(0, 3);
-                            setFormData({ ...formData, houseNo: digits });
+                            handleFieldChange('houseNo', digits);
                           }}
                           placeholder="1"
                           maxLength={3}
                           keyboardType="number-pad"
-                          className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white"
-                          style={{ fontSize: 14 }}
+                          className="w-full px-3 py-3 border rounded-xl bg-white"
+                          style={{ fontSize: 14, borderColor: errors.houseNo ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }}
                         />
                       </View>
                     </View>
                   ) : (
                     <View className="space-y-4">
                       <View>
-                        <Text className="text-gray-700 mb-2 text-xs font-medium">Plaza Name</Text>
-                        <TextInput value={formData.plazaName || ''} onChangeText={text => setFormData({ ...formData, plazaName: text })} placeholder="Enter plaza name" className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                          <Text className="text-gray-700 text-xs font-medium">Plaza Name</Text>
+                          {errors.plazaName ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.plazaName}</Text> : null}
+                        </View>
+                        <TextInput value={formData.plazaName || ''} onChangeText={text => handleFieldChange('plazaName', text)} placeholder="Enter plaza name" className="w-full px-3 py-3 border rounded-xl bg-white" style={{ fontSize: 14, borderColor: errors.plazaName ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }} />
                       </View>
                       <View className="flex-row gap-3">
                         <View className="flex-1">
-                          <Text className="text-gray-700 mb-2 text-xs font-medium">Floor</Text>
-                          <TextInput value={formData.floorNumber || ''} onChangeText={text => setFormData({ ...formData, floorNumber: text })} placeholder="e.g. 1st" className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text className="text-gray-700 text-xs font-medium">Floor</Text>
+                            {errors.floorNumber ? <Text style={{ color: '#EF4444', fontSize: 9 }}>{errors.floorNumber}</Text> : null}
+                          </View>
+                          <TextInput value={formData.floorNumber || ''} onChangeText={text => handleFieldChange('floorNumber', text)} placeholder="e.g. 1st" className="w-full px-3 py-3 border rounded-xl bg-white" style={{ fontSize: 14, borderColor: errors.floorNumber ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }} />
                         </View>
                         <View className="flex-1">
-                          <Text className="text-gray-700 mb-2 text-xs font-medium">Flat No.</Text>
-                          <TextInput value={formData.flatNumber || ''} onChangeText={text => setFormData({ ...formData, flatNumber: text })} placeholder="e.g. A-1" className="w-full px-3 py-3 border border-gray-200 rounded-xl bg-white" style={{ fontSize: 14 }} />
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <Text className="text-gray-700 text-xs font-medium">Flat No.</Text>
+                            {errors.flatNumber ? <Text style={{ color: '#EF4444', fontSize: 9 }}>{errors.flatNumber}</Text> : null}
+                          </View>
+                          <TextInput value={formData.flatNumber || ''} onChangeText={text => handleFieldChange('flatNumber', text)} placeholder="e.g. A-1" className="w-full px-3 py-3 border rounded-xl bg-white" style={{ fontSize: 14, borderColor: errors.flatNumber ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }} />
                         </View>
                       </View>
                     </View>
                   )}
 
                   <View>
-                    <Text className="text-gray-700 mb-2 text-xs font-medium">Password</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text className="text-gray-700 text-xs font-medium">Password</Text>
+                      {errors.password ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.password}</Text> : null}
+                    </View>
                     <View className="relative">
-                      <View className="absolute left-3 top-3.5 z-10"><Lock size={16} color="#9CA3AF" strokeWidth={1.5} /></View>
-                      <TextInput value={formData.password} onChangeText={(text) => setFormData({ ...formData, password: text })} placeholder="Create password" secureTextEntry={!showPassword} className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl bg-white text-gray-900" style={{ fontSize: 14 }} />
+                      <View className="absolute left-3 top-3.5 z-10"><Lock size={16} color={errors.password ? '#EF4444' : '#9CA3AF'} strokeWidth={1.5} /></View>
+                      <TextInput value={formData.password} onChangeText={(text) => handleFieldChange('password', text)} placeholder="Create password" secureTextEntry={!showPassword} className="w-full pl-10 pr-12 py-3 border rounded-xl bg-white text-gray-900" style={{ fontSize: 14, borderColor: errors.password ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }} />
                       <TouchableOpacity onPress={() => setShowPassword(!showPassword)} className="absolute right-3 top-3.5 z-10" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>{showPassword ? <EyeOff size={16} color="#9CA3AF" /> : <Eye size={16} color="#9CA3AF" />}</TouchableOpacity>
                     </View>
                   </View>
 
                   <View>
-                    <Text className="text-gray-700 mb-2 text-xs font-medium">Confirm Password</Text>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                      <Text className="text-gray-700 text-xs font-medium">Confirm Password</Text>
+                      {errors.confirmPassword ? <Text style={{ color: '#EF4444', fontSize: 11 }}>{errors.confirmPassword}</Text> : null}
+                    </View>
                     <View className="relative">
-                      <View className="absolute left-3 top-3.5 z-10"><Lock size={16} color="#9CA3AF" strokeWidth={1.5} /></View>
-                      <TextInput value={formData.confirmPassword} onChangeText={(text) => setFormData({ ...formData, confirmPassword: text })} placeholder="Re-enter password" secureTextEntry={!showConfirmPassword} className="w-full pl-10 pr-12 py-3 border border-gray-200 rounded-xl bg-white text-gray-900" style={{ fontSize: 14 }} />
+                      <View className="absolute left-3 top-3.5 z-10"><Lock size={16} color={errors.confirmPassword ? '#EF4444' : '#9CA3AF'} strokeWidth={1.5} /></View>
+                      <TextInput value={formData.confirmPassword} onChangeText={(text) => handleFieldChange('confirmPassword', text)} placeholder="Re-enter password" secureTextEntry={!showConfirmPassword} className="w-full pl-10 pr-12 py-3 border rounded-xl bg-white text-gray-900" style={{ fontSize: 14, borderColor: errors.confirmPassword ? '#EF4444' : '#E5E7EB', borderWidth: 1, borderRadius: 12 }} />
                       <TouchableOpacity onPress={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-3.5 z-10" hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>{showConfirmPassword ? <EyeOff size={16} color="#9CA3AF" /> : <Eye size={16} color="#9CA3AF" />}</TouchableOpacity>
                     </View>
                   </View>
@@ -715,8 +869,8 @@ export default function SignupScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} disabled={isLoading}>
-                    <LinearGradient colors={['#003E2F', '#027A4C']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="w-full py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-md">
+                  <TouchableOpacity onPress={handleSubmit} activeOpacity={0.8} disabled={!canAttemptSignup}>
+                    <LinearGradient colors={canAttemptSignup ? ['#003E2F', '#027A4C'] : ['#9CA3AF', '#D1D5DB']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} className="w-full py-3.5 rounded-xl flex-row items-center justify-center gap-2 shadow-md">
                       {isLoading ? <ActivityIndicator color="white" /> : <Text className="text-white text-base font-medium">Create Account</Text>}
                     </LinearGradient>
                   </TouchableOpacity>
@@ -738,11 +892,11 @@ export default function SignupScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setShowTermsModal(false)}
         >
-          <View className="flex-1 bg-white">
-            <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200">
-              <View className="flex-row items-center gap-2">
+          <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top', 'bottom']}>
+            <View className="flex-row items-center justify-between px-4 border-b border-gray-200" style={{ paddingTop: Math.max(insets.top, 12) + 8, paddingBottom: 12 }}>
+              <View className="flex-row items-center gap-2" style={{ flex: 1, paddingRight: 12 }}>
                 <FileText size={24} color="#027A4C" />
-                <Text className="text-lg font-semibold text-gray-900">Terms & Conditions</Text>
+                <Text className="text-lg font-semibold text-gray-900" style={{ flexShrink: 1 }}>Terms & Conditions</Text>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -757,7 +911,7 @@ export default function SignupScreen() {
             <ScrollView className="flex-1 px-4 py-4">
               <Text className="text-gray-700 text-sm leading-6">{TERMS_CONTENT}</Text>
             </ScrollView>
-          </View>
+          </SafeAreaView>
         </Modal>
 
         {/* Privacy Policy Modal */}
@@ -767,11 +921,11 @@ export default function SignupScreen() {
           presentationStyle="pageSheet"
           onRequestClose={() => setShowPrivacyModal(false)}
         >
-          <View className="flex-1 bg-white">
-            <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-200">
-              <View className="flex-row items-center gap-2">
+          <SafeAreaView style={{ flex: 1, backgroundColor: 'white' }} edges={['top', 'bottom']}>
+            <View className="flex-row items-center justify-between px-4 border-b border-gray-200" style={{ paddingTop: Math.max(insets.top, 12) + 8, paddingBottom: 12 }}>
+              <View className="flex-row items-center gap-2" style={{ flex: 1, paddingRight: 12 }}>
                 <Shield size={24} color="#027A4C" />
-                <Text className="text-lg font-semibold text-gray-900">Privacy Policy</Text>
+                <Text className="text-lg font-semibold text-gray-900" style={{ flexShrink: 1 }}>Privacy Policy</Text>
               </View>
               <TouchableOpacity
                 onPress={() => {
@@ -786,7 +940,7 @@ export default function SignupScreen() {
             <ScrollView className="flex-1 px-4 py-4">
               <Text className="text-gray-700 text-sm leading-6">{PRIVACY_CONTENT}</Text>
             </ScrollView>
-          </View>
+          </SafeAreaView>
         </Modal>
 
         <StatusModal visible={modal.visible} type={modal.type} title={modal.title} message={modal.message} onClose={handleModalClose} />

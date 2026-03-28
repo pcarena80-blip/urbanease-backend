@@ -12,6 +12,12 @@ const generateToken = (id) => {
     });
 };
 
+const generateRegistrationToken = (email) => {
+    return jwt.sign({ email, purpose: 'registration_verification' }, process.env.JWT_SECRET, {
+        expiresIn: '2h',
+    });
+};
+
 // Helper functions for validation
 const validateEmail = (email) => {
     // Regex for valid email structure and specific domains
@@ -37,7 +43,7 @@ const sendRegistrationOtp = async (req, res) => {
     let { email } = req.body;
     if (!email) return res.status(400).json({ message: 'Email is required' });
 
-    email = email.toLowerCase();
+    email = email.trim().toLowerCase();
 
     if (!validateEmail(email)) {
         return res.status(400).json({ message: 'Invalid email domain' });
@@ -49,8 +55,13 @@ const sendRegistrationOtp = async (req, res) => {
             return res.status(400).json({ message: 'Email already registered. Please login.' });
         }
 
+        const existingVerifiedRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+        if (existingVerifiedRecord) {
+            return res.json({ message: 'Email already verified', verified: true });
+        }
+
         const otp = generateOTP();
-        const expiresAt = Date.now() + 1 * 60 * 1000; // 1 minute only
+        const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes for OTP entry
 
         // Update or create OTP record
         await RegistrationOtp.findOneAndUpdate(
@@ -62,7 +73,7 @@ const sendRegistrationOtp = async (req, res) => {
         const message = `
             <h1>Registration OTP</h1>
             <p>Your OTP for UrbanEase registration is: <h2>${otp}</h2></p>
-            <p>This code expires in 1 minute.</p>
+            <p>This code expires in 10 minutes.</p>
         `;
 
         const emailSent = await sendEmail({
@@ -97,7 +108,7 @@ const verifyRegistrationOtp = async (req, res) => {
         return res.status(400).json({ message: 'Email and OTP are required' });
     }
 
-    email = email.toLowerCase();
+    email = email.trim().toLowerCase();
 
     try {
         console.log('[DEBUG] Querying RegistrationOtp collection...');
@@ -118,11 +129,13 @@ const verifyRegistrationOtp = async (req, res) => {
         console.log('[DEBUG] Record found, verifying...');
         // Mark as verified
         record.isVerified = true;
-        // record.otp = undefined; // KEEP OTP for now to debug if deletion causes issues, but standard is to keep or invalidate
+        // Keep the verified record alive long enough for the user to finish the signup form.
+        record.expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour after verification
         await record.save();
         console.log('[DEBUG] Email verified successfully');
 
-        res.json({ message: 'Email verified successfully', verified: true });
+        const registrationToken = generateRegistrationToken(email);
+        res.json({ message: 'Email verified successfully', verified: true, registrationToken });
     } catch (error) {
         console.error('[DEBUG] verifyRegistrationOtp Error:', error);
         res.status(500).json({ message: 'Server error' });
@@ -132,8 +145,8 @@ const verifyRegistrationOtp = async (req, res) => {
 // @desc    Register new user (Requires Verified Email)
 // @route   POST /api/auth/signup
 // @access  Public
-const registerUser = async (req, res) => {
-    let { name, fullName, email, phone, password } = req.body;
+const submitSignUpForm = async (req, res) => {
+    let { name, fullName, email, phone, password, registrationToken } = req.body;
 
     if (!name && fullName) name = fullName;
 
@@ -141,7 +154,7 @@ const registerUser = async (req, res) => {
         return res.status(400).json({ message: 'Please add all fields' });
     }
 
-    email = email.toLowerCase();
+    email = email.trim().toLowerCase();
 
     // FINAL VALIDATION CHECK
     if (!validatePassword(password)) {
@@ -149,12 +162,25 @@ const registerUser = async (req, res) => {
     }
 
     try {
-        // Double check email verification status
-        const verificationRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+        let isEmailVerified = false;
 
-        // IMPORTANT: In production, enforce this. For now, if no record exists but we are testing, we might optionally skip. 
-        // But user said "No shortcuts". So we ENFORCE.
-        if (!verificationRecord) {
+        if (registrationToken) {
+            try {
+                const decoded = jwt.verify(registrationToken, process.env.JWT_SECRET);
+                if (decoded?.purpose === 'registration_verification' && decoded?.email === email) {
+                    isEmailVerified = true;
+                }
+            } catch (tokenError) {
+                console.warn('[DEBUG] Invalid registrationToken provided:', tokenError.message);
+            }
+        }
+
+        if (!isEmailVerified) {
+            const verificationRecord = await RegistrationOtp.findOne({ email, isVerified: true });
+            isEmailVerified = !!verificationRecord;
+        }
+
+        if (!isEmailVerified) {
             return res.status(400).json({ message: 'Email not verified. Please verify using OTP first.' });
         }
 
@@ -427,7 +453,7 @@ const resetPassword = async (req, res) => {
 };
 
 module.exports = {
-    registerUser,
+    submitSignUpForm,
     submitLoginCredentials,
     updateProfile,
     getProfile,

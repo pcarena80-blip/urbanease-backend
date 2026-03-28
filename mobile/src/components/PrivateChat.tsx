@@ -17,7 +17,6 @@ export default function PrivateChat() {
   useEffect(() => {
     loadCachedInbox();
     loadData();
-    // Refresh every 5 seconds
     const interval = setInterval(loadData, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -67,7 +66,6 @@ export default function PrivateChat() {
   const handleAcceptRequest = async (requestId: string) => {
     try {
       await api.chat.respondToRequest(requestId, 'accepted');
-      // Refresh lists
       await loadData();
       Alert.alert('Success', 'Request accepted! You can now chat.');
     } catch (error: any) {
@@ -78,7 +76,6 @@ export default function PrivateChat() {
   const handleRejectRequest = async (requestId: string) => {
     try {
       await api.chat.respondToRequest(requestId, 'rejected');
-      // Refresh lists
       await loadData();
     } catch (error: any) {
       Alert.alert('Error', error.message || 'Failed to reject request');
@@ -95,8 +92,6 @@ export default function PrivateChat() {
 
   const handleSearch = async () => {
     try {
-      // Create a set of existing user IDs (friends + pending requests + existing chats) to filter search?
-      // For now, keep existing search logic but only show if not blocked
       const users = await api.auth.searchUsers(searchQuery);
 
       const mapped = users.map((u: any) => ({
@@ -108,11 +103,6 @@ export default function PrivateChat() {
         online: false,
         unreadCount: 0
       }));
-
-      // In the new flow, tapping a search result should probably trigger the "Check Status" flow
-      // But for now, let's just show them. 
-      // The PrivateChatDetail will handle the check logic if we add it there, 
-      // or we can trap the navigation here.
 
       setConversations(prev => {
         const existingIds = new Set(prev.map(c => c.id));
@@ -129,15 +119,7 @@ export default function PrivateChat() {
   );
 
   const onChatPress = async (contact: any) => {
-    // If it's a real chat (has message/time), proceed
-    // If it's a search result, we might need to check status
-    // But actually, PrivateChatDetail doesn't check status yet on MOUNT, 
-    // backend checks on SEND.
-    // So navigating is fine. 
-    // However, to be consistent, we should check status if it's a new contact.
-
     if (contact.lastMessage === 'Tap to check status') {
-      // It's a search result
       try {
         const status = await api.chat.getChatStatus(contact.id);
         if (status.status === 'accepted') {
@@ -176,9 +158,7 @@ export default function PrivateChat() {
 
   return (
     <View className="flex-1 bg-white">
-      {/* Search Header */}
       <View className="px-4 py-2 bg-white border-b border-gray-100">
-        {/* Tabs */}
         <View className="flex-row mb-3 bg-gray-100 p-1 rounded-xl">
           <TouchableOpacity
             onPress={() => setActiveTab('chats')}
@@ -230,9 +210,7 @@ export default function PrivateChat() {
                 className="w-full px-6 py-4 border-b border-gray-100 flex-row items-center gap-4"
               >
                 <View className="relative">
-                  <View
-                    className="w-12 h-12 rounded-full items-center justify-center bg-[#027A4C]"
-                  >
+                  <View className="w-12 h-12 rounded-full items-center justify-center bg-[#027A4C]">
                     <Text className="text-white text-sm font-semibold">
                       {contact.avatar}
                     </Text>
@@ -265,7 +243,6 @@ export default function PrivateChat() {
             ))
           )
         ) : (
-          // Requests Tab
           chatRequests.length === 0 ? (
             <View className="flex-1 items-center justify-center py-20">
               <Text className="text-gray-400 text-base">No pending requests</Text>
@@ -311,7 +288,3 @@ export default function PrivateChat() {
     </View>
   );
 }
-
-
-
-

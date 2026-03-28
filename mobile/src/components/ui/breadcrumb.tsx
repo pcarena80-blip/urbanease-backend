@@ -50,16 +50,14 @@ function BreadcrumbLink({
   );
 }
 
-function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
+function BreadcrumbPage({ className, children }: { className?: string; children?: React.ReactNode }) {
   return (
     <Text
       data-slot="breadcrumb-page"
-      role="link"
-      aria-disabled="true"
-      aria-current="page"
       className={cn("text-foreground font-normal", className)}
-      {...props}
-    />
+    >
+      {children}
+    </Text>
   );
 }
 
@@ -83,18 +81,19 @@ function BreadcrumbSeparator({
 
 function BreadcrumbEllipsis({
   className,
-  ...props
-}: React.ComponentProps<"span">) {
+  children,
+}: { className?: string; children?: React.ReactNode }) {
   return (
     <Text
       data-slot="breadcrumb-ellipsis"
-      role="presentation"
-      aria-hidden="true"
       className={cn("flex size-9 items-center justify-center", className)}
-      {...props}
     >
-      <MoreHorizontal className="size-4" />
-      <Text className="sr-only">More</Text>
+      {children ?? (
+        <>
+          <MoreHorizontal className="size-4" />
+          <Text className="sr-only">More</Text>
+        </>
+      )}
     </Text>
   );
 }

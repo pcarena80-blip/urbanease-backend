@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 console.log('LOADING AUTH ROUTES...');
 const {
-    registerUser,
+    submitSignUpForm,
     submitLoginCredentials,
     updateProfile,
     getProfile,
@@ -16,7 +16,7 @@ const {
 } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
-router.post('/signup', registerUser);
+router.post('/signup', submitSignUpForm);
 router.post('/login', submitLoginCredentials);
 router.post('/send-otp', sendRegistrationOtp); // New
 router.post('/verify-otp', verifyRegistrationOtp); // New

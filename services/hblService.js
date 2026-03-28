@@ -9,6 +9,7 @@ const ENV_PRODUCTION = 'production';
 
 const BASE_URL_SANDBOX = 'https://testpaymentapi.hbl.com/';
 const BASE_URL_PRODUCTION = 'https://digitalbankingportal.hbl.com/';
+const PUBLIC_SERVER_URL = (process.env.PUBLIC_SERVER_URL || process.env.APP_BASE_URL || 'http://51.20.34.254:5000').replace(/\/+$/, '');
 
 class HBLService {
     constructor() {
@@ -19,8 +20,8 @@ class HBLService {
         this.userId = process.env.HBL_USER_ID;
         this.password = process.env.HBL_PASSWORD;
         this.channel = process.env.HBL_CHANNEL || 'HBLPay';
-        this.returnUrl = process.env.HBL_RETURN_URL || 'http://localhost:5000/api/payment/return';
-        this.cancelUrl = process.env.HBL_CANCEL_URL || 'http://localhost:5000/api/payment/cancel';
+        this.returnUrl = process.env.HBL_RETURN_URL || `${PUBLIC_SERVER_URL}/api/payment/return`;
+        this.cancelUrl = process.env.HBL_CANCEL_URL || `${PUBLIC_SERVER_URL}/api/payment/cancel`;
 
         // Load Keys
         try {
@@ -160,7 +161,7 @@ class HBLService {
     getRedirectUrl(sessionId) {
         // MOCK MODE URL
         if (sessionId.startsWith('MOCK_SESSION')) {
-            return `http://localhost:5000/api/payment/mock-page?session_id=${sessionId}`;
+            return `${PUBLIC_SERVER_URL}/api/payment/mock-page?session_id=${sessionId}`;
         }
 
         const uriToken = this.env === ENV_SANDBOX ? 'HBLPay' : 'HostedCheckout';

@@ -2,82 +2,78 @@
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
-// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
-// const BASE_URL = 'https://musicians-index-vector-reef.trycloudflare.com/api';
-// AWS EC2 via Cloudflare Tunnel (HTTPS - 24/7 Production)
-// const BASE_URL = 'https://outlet-coverage-burns-abstract.trycloudflare.com/api';
-// Local Network Dev (Localtunnel) - INACTIVE (service issues)
-// const BASE_URL = 'https://bright-news-shout.loca.lt/api';
-// Local Network Dev (Localtunnel)
-// const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Localtunnel)
-// const BASE_URL = 'https://new-geese-sleep.loca.lt/api';
-// Local Network Dev (Direct WiFi) - DEV ONLY (Use this when running backend locally)
-// Local Network Dev (Direct WiFi) - DEV ONLY (Use this when running backend locally)
-// export const BASE_URL = 'http://192.168.18.131:5000/api';
-// AWS Direct HTTP - PRODUCTION
-export const BASE_URL = 'http://51.20.34.254:5000/api';
-// Cloud Production (Any WiFi/4G)
-// const BASE_URL = 'https://urbanease-backend-suham.onrender.com/api';
+const DEFAULT_API_BASE_URL = 'https://urbanease-api.duckdns.org/api';
+const configuredBaseUrl = (process.env.EXPO_PUBLIC_API_BASE_URL || '').trim();
+
+const normalizeBaseUrl = (url) => {
+    if (!url) return DEFAULT_API_BASE_URL;
+    const trimmed = url.replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed : `${trimmed}/api`;
+};
+
+export const BASE_URL = normalizeBaseUrl(configuredBaseUrl || DEFAULT_API_BASE_URL);
+export const API_ORIGIN = BASE_URL.replace(/\/api\/?$/, '');
+
 console.log('🌐 API BASE_URL:', BASE_URL);
 
-// Previous URLs (for reference)
-// AWS Direct HTTP: 'http://51.20.34.254:5000/api' (blocked by Android)
-// Local Dev: 'http://192.168.18.131:5000/api'
-// Render Backup: 'https://urbanease-backend-suham.onrender.com/api'
+let cachedToken = null;
+let onUnauthorizedCallback = null;
+const NOTIFICATION_SEEN_KEY = 'seenNotifications';
 
 const getHeaders = async () => {
-    const token = await AsyncStorage.getItem('token');
+    if (!cachedToken) {
+        cachedToken = await AsyncStorage.getItem('token');
+    }
+    
     return {
         'Content-Type': 'application/json',
-        'Authorization': token ? `Bearer ${token}` : '',
+        'Authorization': cachedToken ? `Bearer ${cachedToken}` : '',
         'Bypass-Tunnel-Reminder': 'true',
     };
 };
 
-// Helper function for better error handling
+export const updateApiToken = (newToken) => {
+    cachedToken = newToken;
+};
+
+export const setOnUnauthorized = (callback) => {
+    onUnauthorizedCallback = callback;
+};
+
 const handleApiError = async (error, endpoint) => {
     console.error(`❌ API Error [${endpoint}]:`, error);
-
-    // Auto-logout on 401 errors (invalid/expired token)
-    if (error.message.includes('Not authorized') || error.message.includes('401')) {
-        console.log('🔑 Token invalid - clearing authentication');
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
-        // The app will redirect to login automatically
-    }
 
     if (error.message.includes('Failed to fetch') || error.message.includes('Network request failed')) {
         throw new Error('Cannot connect to server. Please check your internet connection.');
     }
 
     if (error.message.includes('timeout')) {
-        throw new Error('Request timeout. Server is taking too long to respond.');
+        throw new Error('Request timeout. Server is slow.');
     }
 
     throw error;
 };
 
-// Global request helper to handle errors centralized
 const request = async (endpoint, options = {}, retries = 3) => {
     try {
         const isFormData = options.body instanceof FormData;
         const defaultHeaders = isFormData ? {} : { 'Content-Type': 'application/json' };
 
+        const finalHeaders = {
+            ...defaultHeaders,
+            ...options.headers,
+        };
+
         const response = await fetch(`${BASE_URL}${endpoint}`, {
             ...options,
-            headers: {
-                ...defaultHeaders,
-                ...options.headers,
-            },
+            headers: finalHeaders,
         });
 
-        // Handle 401 Unauthorized globally
         if (response.status === 401) {
-            console.log('🔑 Authentication failed (401) - Logging out...');
-            await AsyncStorage.removeItem('token');
-            await AsyncStorage.removeItem('user');
+            console.log('🔑 401 Unauthorized detected');
+            if (onUnauthorizedCallback) {
+                onUnauthorizedCallback();
+            }
             throw new Error('Not authorized');
         }
 
@@ -89,33 +85,19 @@ const request = async (endpoint, options = {}, retries = 3) => {
             }
             return data;
         } else {
-            // Handle non-JSON responses (Cloudflare 502 Bad Gateway or Local 404)
             const text = await response.text();
-            console.error(`❌ Non-JSON Response [${response.status}]:`, text.substring(0, 200));
-
-            if (text.startsWith('Bad Gateway') || response.status === 502) {
+            if (response.status === 502 || text.includes('Bad Gateway')) {
                 if (retries > 0) {
-                    const delay = (4 - retries) * 1000 * 2;
-                    console.log(`♻️ Server overloaded (502). Retrying in ${delay / 1000}s... (${retries} left)`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
+                    await new Promise(resolve => setTimeout(resolve, 2000));
                     return request(endpoint, options, retries - 1);
                 }
-                throw new Error('Server is warming up. Please wait a minute and pull to refresh.');
             }
-            // Throw HTML content as error to see it on screen
-            throw new Error(`Server Error (${response.status}): ${text.substring(0, 100)}...`);
+            throw new Error(`Server Error (${response.status})`);
         }
     } catch (error) {
-        // If network request failed (e.g. timeout), also retry
-        if (retries > 0 && (error.message.includes('Network request failed') || error.message.includes('timeout') || error.message.includes('busy'))) {
-            const delay = (4 - retries) * 1000 * 2;
-            console.log(`♻️ Network/Server error. Retrying in ${delay / 1000}s... (${retries} left)`);
-            await new Promise(resolve => setTimeout(resolve, delay));
+        if (retries > 0 && (error.message.includes('Network request failed') || error.message.includes('timeout'))) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
             return request(endpoint, options, retries - 1);
-        }
-        // If timeout specifically
-        if (error.message.includes('Aborted') || error.message.includes('timeout')) {
-            throw new Error('Connection timed out. Server is slow or busy.');
         }
         return handleApiError(error, endpoint);
     }
@@ -124,76 +106,181 @@ const request = async (endpoint, options = {}, retries = 3) => {
 export const api = {
     auth: {
         submitLoginCredentials: async (email, password) => {
-            return request('/auth/login', {
+            const data = await request('/auth/login', {
                 method: 'POST',
                 body: JSON.stringify({ email, password }),
             });
+            if (data.token) cachedToken = data.token;
+            return data;
         },
-        signup: async (userData) => {
-            return request('/auth/signup', {
+        submitSignUpForm: async (userData) => {
+            const data = await request('/auth/signup', {
                 method: 'POST',
                 body: JSON.stringify(userData),
             });
+            if (data.token) cachedToken = data.token;
+            return data;
         },
         logout: async () => {
+            cachedToken = null;
             await AsyncStorage.removeItem('token');
             await AsyncStorage.removeItem('user');
         },
-        sendOtp: async (email) => { // Send Registration OTP
-            return request('/auth/send-otp', {
-                method: 'POST',
-                body: JSON.stringify({ email }),
-            });
+        getProfile: async () => {
+            return request('/auth/profile', { headers: await getHeaders() });
         },
-        verifyOtp: async (email, otp) => { // Verify Registration OTP
-            return request('/auth/verify-otp', {
-                method: 'POST',
-                body: JSON.stringify({ email, otp }),
-            });
+        sendOtp: async (email) => {
+            return request('/auth/send-otp', { method: 'POST', body: JSON.stringify({ email }) });
         },
-        forgotPassword: async (email) => { // Send Reset OTP
-            return request('/auth/forgot-password', {
-                method: 'POST',
-                body: JSON.stringify({ email }),
-            });
-        },
-        verifyResetOtp: async (email, otp) => { // Verify Reset OTP (before setting pwd)
-            return request('/auth/verify-reset-otp', {
-                method: 'POST',
-                body: JSON.stringify({ email, otp }),
-            });
-        },
-        resetPassword: async (email, otp, newPassword) => { // Set new password
-            return request('/auth/reset-password', {
-                method: 'POST',
-                body: JSON.stringify({ email, otp, newPassword }),
-            });
+        verifyOtp: async (email, otp) => {
+            return request('/auth/verify-otp', { method: 'POST', body: JSON.stringify({ email, otp }) });
         },
         searchUsers: async (query) => {
             return request(`/auth/users?search=${query}`, { headers: await getHeaders() });
-        },
-        getProfile: async () => {
-            return request('/auth/profile', { headers: await getHeaders() });
         }
+    },
+    profile: {
+        requestEditProfileForm: async () => {
+            return request('/profile', { headers: await getHeaders() });
+        },
+        submitProfileChanges: async (profileData) => {
+            return request('/profile', {
+                method: 'PUT',
+                headers: await getHeaders(),
+                body: JSON.stringify(profileData)
+            });
+        }
+    },
+    notices: {
+        requestNoticesScreen: async () => {
+            return request('/notices', { headers: await getHeaders() });
+        }
+    },
+    notifications: {
+        getSeenIds: async () => {
+            const raw = await AsyncStorage.getItem(NOTIFICATION_SEEN_KEY);
+            if (!raw) return [];
+
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (error) {
+                return [];
+            }
+        },
+        markAllSeen: async (notificationIds = []) => {
+            if (!Array.isArray(notificationIds) || notificationIds.length === 0) {
+                return [];
+            }
+
+            const existingIds = await api.notifications.getSeenIds();
+            const mergedIds = Array.from(new Set([...existingIds, ...notificationIds]));
+            await AsyncStorage.setItem(NOTIFICATION_SEEN_KEY, JSON.stringify(mergedIds));
+            return mergedIds;
+        },
+        // Aggregate notifications from all real sources in parallel
+        getAll: async () => {
+            const results = await Promise.allSettled([
+                request('/notices', { headers: await getHeaders() }),
+                request('/bills', { headers: await getHeaders() }),
+                request('/complaints', { headers: await getHeaders() }),
+            ]);
+            const seenIds = new Set(await api.notifications.getSeenIds());
+
+            const [noticesRes, billsRes, complaintsRes] = results;
+            const unified = [];
+
+            // Notices → notification items
+            if (noticesRes.status === 'fulfilled' && Array.isArray(noticesRes.value)) {
+                noticesRes.value.forEach(n => {
+                    unified.push({
+                        id: `notice-${n._id}`,
+                        type: 'notice',
+                        title: n.title,
+                        description: n.description,
+                        time: n.createdAt,
+                        read: false,
+                        raw: n,
+                    });
+                });
+            }
+
+            // Bills → notify if status is 'due'
+            if (billsRes.status === 'fulfilled' && Array.isArray(billsRes.value)) {
+                billsRes.value
+                    .filter(b => b.status === 'due')
+                    .forEach(b => {
+                        unified.push({
+                            id: `bill-${b._id}`,
+                            type: 'bill',
+                            title: `${b.type?.charAt(0).toUpperCase() + b.type?.slice(1)} Bill Due`,
+                            description: `Rs. ${b.amount?.toLocaleString()} due on ${b.dueDate} — ${b.provider}`,
+                            time: b.createdAt,
+                            read: false,
+                            raw: b,
+                        });
+                    });
+            }
+
+            // Complaints → notify when resolved, in-progress, or rejected
+            if (complaintsRes.status === 'fulfilled' && Array.isArray(complaintsRes.value)) {
+                complaintsRes.value
+                    .filter(c => c.status !== 'pending')
+                    .forEach(c => {
+                        const statusLabel = {
+                            'in-progress': 'In Progress',
+                            'resolved': 'Resolved',
+                            'rejected': 'Rejected',
+                        }[c.status] || c.status;
+                        unified.push({
+                            id: `complaint-${c._id}`,
+                            type: 'complaint',
+                            title: `Complaint ${statusLabel}`,
+                            description: `"${c.subject}" — ${c.response || 'Admin has reviewed your complaint.'}`,
+                            time: c.updatedAt || c.createdAt,
+                            read: c.status === 'resolved',
+                            raw: c,
+                        });
+                    });
+            }
+
+            // Sort by most recent first
+            unified.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime());
+            return unified.map((item) => ({
+                ...item,
+                read: item.read || seenIds.has(item.id),
+            }));
+        },
     },
     bills: {
         getAll: async () => {
             return request('/bills', { headers: await getHeaders() });
         },
-        generate: async (type) => {
-            // type: 'electricity', 'gas', 'maintenance'
-            return request('/bills/generate', {
-                method: 'POST',
-                headers: await getHeaders(),
-                body: JSON.stringify({ type })
-            });
-        },
-        pay: async (paymentData) => {
-            // paymentData: { referenceId, paymentMethod, mobileNumber, amount }
+        pay: async (billOrPaymentData, maybePaymentData) => {
+            const billId =
+                typeof billOrPaymentData === 'string'
+                    ? billOrPaymentData
+                    : billOrPaymentData?.billId || billOrPaymentData?._id;
+
+            const payload =
+                typeof billOrPaymentData === 'string'
+                    ? maybePaymentData
+                    : billId
+                        ? { ...billOrPaymentData, billId: undefined, _id: undefined }
+                        : billOrPaymentData;
+
+            if (billId) {
+                return request(`/bills/${billId}`, {
+                    method: 'PUT',
+                    headers: await getHeaders(),
+                    body: JSON.stringify(payload)
+                });
+            }
+
             return request('/bills/pay', {
                 method: 'POST',
                 headers: await getHeaders(),
-                body: JSON.stringify(paymentData)
+                body: JSON.stringify(payload)
             });
         }
     },
@@ -203,10 +290,7 @@ export const api = {
         },
         submitComplaint: async (complaintData) => {
             const headers = await getHeaders();
-            // Remove Content-Type if FormData to let browser set boundary
-            if (complaintData instanceof FormData) {
-                delete headers['Content-Type'];
-            }
+            if (complaintData instanceof FormData) delete headers['Content-Type'];
             return request('/complaints', {
                 method: 'POST',
                 headers: headers,
@@ -214,53 +298,54 @@ export const api = {
             });
         }
     },
-    chat: {
-        displayChatWindow: async (userId) => {
-            return request(`/chat/${userId}`, { headers: await getHeaders() });
+    carpool: {
+        getAll: async () => {
+            return request('/carpool', { headers: await getHeaders() });
         },
+        create: async (payload) => {
+            return request('/carpool', {
+                method: 'POST',
+                headers: await getHeaders(),
+                body: JSON.stringify(payload)
+            });
+        },
+        delete: async (id) => {
+            return request(`/carpool/${id}`, { method: 'DELETE', headers: await getHeaders() });
+        },
+        report: async (id, reason) => {
+            return request(`/carpool/${id}/report`, {
+                method: 'POST',
+                headers: await getHeaders(),
+                body: JSON.stringify({ reason })
+            });
+        }
+    },
+    chat: {
         getInbox: async () => {
             return request('/chat/inbox', { headers: await getHeaders() });
         },
+        displayChatWindow: async (userId) => {
+            return request(`/chat/${userId}`, { headers: await getHeaders() });
+        },
         sendMessage: async (messageData) => {
             const headers = await getHeaders();
-
-            // If FormData (for file uploads), remove Content-Type to let browser set it with boundary
             if (messageData instanceof FormData) {
                 delete headers['Content-Type'];
-                return request('/chat', {
-                    method: 'POST',
-                    headers: headers,
-                    body: messageData
-                });
-            } else {
-                // Regular JSON message
-                return request('/chat', {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(messageData)
-                });
+                return request('/chat', { method: 'POST', headers: headers, body: messageData });
             }
+            return request('/chat', { method: 'POST', headers: headers, body: JSON.stringify(messageData) });
         },
-        deleteMessage: async (messageId) => {
-            return request(`/chat/${messageId}`, {
-                method: 'DELETE',
-                headers: await getHeaders()
-            });
+        markAsRead: async (chatId) => {
+            return request(`/chat/read/${chatId}`, { method: 'POST', headers: await getHeaders() });
         },
         requestChatCenter: async () => {
             return request('/chat/unread', { headers: await getHeaders() });
         },
-        markAsRead: async (chatId) => {
-            return request(`/chat/read/${chatId}`, {
-                method: 'POST',
-                headers: await getHeaders()
-            });
-        },
-        reportMessage: async (messageId, reason, description = '') => {
+        reportMessage: async (messageId, reason) => {
             return request('/chat/report', {
                 method: 'POST',
                 headers: await getHeaders(),
-                body: JSON.stringify({ messageId, reason, description })
+                body: JSON.stringify({ messageId, reason })
             });
         },
         sendRequest: async (receiverId) => {
@@ -283,45 +368,17 @@ export const api = {
         getChatStatus: async (userId) => {
             return request(`/chat/status/${userId}`, { headers: await getHeaders() });
         },
+        deleteMessage: async (messageId) => {
+            return request(`/chat/${messageId}`, { method: 'DELETE', headers: await getHeaders() });
+        },
         deleteConnection: async (userId) => {
-            return request(`/chat/connection/${userId}`, {
-                method: 'DELETE',
-                headers: await getHeaders()
-            });
+            return request(`/chat/connection/${userId}`, { method: 'DELETE', headers: await getHeaders() });
         }
     },
-    notices: {
-        requestNoticesScreen: async () => {
-            return request('/notices', { headers: await getHeaders() });
-        }
-    },
-    profile: {
-        requestEditProfileForm: async () => {
-            return request('/profile', { headers: await getHeaders() });
-        },
-        getById: async (id) => {
-            return request(`/profile/${id}`, { headers: await getHeaders() });
-        },
-        submitProfileChanges: async (profileData) => {
-            return request('/profile', {
-                method: 'PUT',
-                headers: await getHeaders(),
-                body: JSON.stringify(profileData)
-            });
-        }
-    },
-    // Helper for image URLs
     getImageUrl: (path) => {
         if (!path) return null;
         if (path.startsWith('http')) return path;
-
-        // Remove backslashes if any (Windows path fix)
-        const cleanPath = path.replace(/\\/g, '/');
-        const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
-
-        // Get root URL from BASE_URL (remove /api)
-        const rootUrl = BASE_URL.replace(/\/api\/?$/, '');
-
-        return `${rootUrl}/${normalizedPath}`;
+        const cleanPath = path.replace(/\\/g, '/').startsWith('/') ? path.substring(1) : path;
+        return `${API_ORIGIN}/${cleanPath.replace(/\\/g, '/')}`;
     }
 };

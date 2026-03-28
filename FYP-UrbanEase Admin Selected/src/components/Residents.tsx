@@ -48,6 +48,14 @@ export function Residents({ searchQuery = '' }: { searchQuery?: string }) {
 
   useEffect(() => {
     fetchUsers();
+    const intervalId = window.setInterval(fetchUsers, 15000);
+    const handleFocus = () => fetchUsers();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleVerify = async (userId: string, isVerified: boolean) => {

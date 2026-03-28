@@ -1,7 +1,7 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, Text, TouchableOpacity, TextInput, Image, ScrollView, StyleSheet, Platform, ActivityIndicator, Modal, Alert, AppState } from 'react-native';
-import { api } from '../services/api';
+import { api, updateApiToken, setOnUnauthorized } from '../services/api';
 
 interface AuthContextType {
     user: any;
@@ -21,13 +21,33 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [loading, setLoading] = useState(true);
     const [prefetching, setPrefetching] = useState(false);
 
+    const logout = useCallback(async () => {
+        console.log('🔄 AuthContext: Performing logout');
+        setUser(null);
+        updateApiToken(null);
+        await api.auth.logout();
+        
+        // Clear cached data
+        const cachedKeys = [
+            'cachedNotices', 'cachedBills', 'cachedComplaints', 
+            'cachedCommunityMessages', 'cachedInbox', 'lastReadCommunityMessageId'
+        ];
+        for (const key of cachedKeys) {
+            await AsyncStorage.removeItem(key);
+        }
+    }, []);
+
     useEffect(() => {
+        // Handle 401 globally
+        setOnUnauthorized(() => {
+            console.warn('⚠️ Unauthorized access detected - triggering logout');
+            logout();
+        });
+
         loadStorageData();
 
-        // Listen for app state changes to refresh data when app comes to foreground
         const subscription = AppState.addEventListener('change', (nextAppState) => {
             if (nextAppState === 'active') {
-                // App became active, refresh data in background
                 prefetchAppData();
             }
         });
@@ -35,7 +55,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return () => {
             subscription?.remove();
         };
-    }, []);
+    }, [logout]);
 
     const loadStorageData = async () => {
         try {
@@ -43,26 +63,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const token = await AsyncStorage.getItem('token');
             if (authDataSerialized && token) {
                 const _authData = JSON.parse(authDataSerialized);
+                updateApiToken(token);
 
-                // Verify with server that account is still valid and verified
                 try {
                     const profile = await api.auth.getProfile();
                     if (profile && profile.isVerified) {
                         setUser(_authData);
                         prefetchAppData();
                     } else {
-                        // User is not verified by admin - force logout
-                        console.log('Account not verified by admin - clearing session');
-                        await AsyncStorage.removeItem('token');
-                        await AsyncStorage.removeItem('user');
-                        setUser(null);
+                        console.log('Account not verified - clearing session');
+                        await logout();
                     }
-                } catch (error) {
-                    // Token invalid or server error - clear session
-                    console.log('Session validation failed - clearing session');
-                    await AsyncStorage.removeItem('token');
-                    await AsyncStorage.removeItem('user');
-                    setUser(null);
+                } catch (error: any) {
+                    if (error.message === 'Not authorized') {
+                        // Already handled by setOnUnauthorized
+                    } else {
+                        // Keep offline access
+                        setUser(_authData);
+                    }
                 }
             }
         } catch (error) {
@@ -73,12 +91,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const prefetchAppData = async () => {
-        if (prefetching) return;
+        if (!user || prefetching) return;
         setPrefetching(true);
         try {
             console.log('Prefetching app data...');
-            // Fetch all critical data in parallel
-            // We use allSettled to ensure one failure doesn't stop others
             const results = await Promise.allSettled([
                 api.notices.requestNoticesScreen(),
                 api.bills.getAll(),
@@ -93,14 +109,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             const communityMessages = results[3].status === 'fulfilled' ? results[3].value : [];
             const inbox = results[4].status === 'fulfilled' ? results[4].value : [];
 
-            // Log failures for debugging but don't block app
-            results.forEach((result, index) => {
-                if (result.status === 'rejected') {
-                    console.warn(`Prefetch failed for index ${index}:`, result.reason);
-                }
-            });
-
-            // Cache data in AsyncStorage for instant load next time
             if (results[0].status === 'fulfilled') await AsyncStorage.setItem('cachedNotices', JSON.stringify(notices));
             if (results[1].status === 'fulfilled') await AsyncStorage.setItem('cachedBills', JSON.stringify(bills));
             if (results[2].status === 'fulfilled') await AsyncStorage.setItem('cachedComplaints', JSON.stringify(complaints));
@@ -117,23 +125,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const loginSuccessful = async (data: any) => {
         setUser(data);
+        updateApiToken(data.token);
         await AsyncStorage.setItem('token', data.token);
         await AsyncStorage.setItem('user', JSON.stringify(data));
-
-        // Prefetch data immediately after login
         await prefetchAppData();
-    };
-
-    const logout = async () => {
-        setUser(null);
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('user');
-        // Clear cached data
-        await AsyncStorage.removeItem('cachedNotices');
-        await AsyncStorage.removeItem('cachedBills');
-        await AsyncStorage.removeItem('cachedComplaints');
-        await AsyncStorage.removeItem('cachedCommunityMessages');
-        await AsyncStorage.removeItem('cachedInbox');
     };
 
     const updateUser = async (data: any) => {
@@ -154,6 +149,3 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 };
 
 export const useAuth = () => useContext(AuthContext);
-
-
-

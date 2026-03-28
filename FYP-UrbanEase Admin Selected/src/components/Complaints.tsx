@@ -45,6 +45,14 @@ export function Complaints({ searchQuery = '' }: { searchQuery?: string }) {
 
   useEffect(() => {
     fetchComplaints();
+    const intervalId = window.setInterval(fetchComplaints, 15000);
+    const handleFocus = () => fetchComplaints();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleUpdateStatus = async (id: string, newStatus: string) => {

@@ -1,5 +1,5 @@
 import io, { Socket } from 'socket.io-client';
-import { BASE_URL } from './api';
+import { API_ORIGIN } from './api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 let socket;
@@ -12,10 +12,7 @@ export const socketService = {
         const userData = await AsyncStorage.getItem('user');
         const user = userData ? JSON.parse(userData) : null;
 
-        // Base URL is http://IP:5000/api -> we need http://IP:5000
-        const socketUrl = BASE_URL.replace('/api', '');
-
-        socket = io(socketUrl, {
+        socket = io(API_ORIGIN, {
             auth: { token },
             query: { userId: user?._id },
             transports: ['websocket', 'polling'], // Allow fallback
